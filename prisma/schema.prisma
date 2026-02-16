@@ -1,0 +1,110 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// Enums based on your report and diagram
+enum SlotStatus {
+  FREE
+  OCCUPIED
+  RESERVED
+}
+
+enum LogEventType {
+  ENTRY
+  EXIT
+  OBSTRUCTION
+}
+
+enum ReservationStatus {
+  ACTIVE
+  CANCELLED
+  COMPLETED
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+}
+
+// ---------------------------------------------------------
+// Models derived from your ER Diagram
+// ---------------------------------------------------------
+
+model ParkingSlot {
+  slot_id             String   @id // e.g. "A1"
+  status              SlotStatus @default(FREE)
+  location_coordinates String   // Stores JSON string "{x:10, y:0, z:5}" for Three.js
+  is_active           Boolean  @default(true) // Hardware availability
+
+  // Relations
+  logs         SensorLog[]
+  reservations Reservation[]
+  sessions     ParkingSession[]
+
+  @@map("parking_slots")
+}
+
+model PricingRule {
+  rule_id        String   @id @default(uuid())
+  rate_per_hour  Float    @default(20.00)
+  effective_from DateTime @default(now())
+
+  @@map("pricing_rules")
+}
+
+model SensorLog {
+  log_id     String       @id @default(uuid())
+  slot_id    String
+  timestamp  DateTime     @default(now())
+  event_type LogEventType
+  raw_data   String?      // Raw IR sensor value
+
+  // Relations
+  slot       ParkingSlot  @relation(fields: [slot_id], references: [slot_id])
+
+  @@map("sensor_logs")
+}
+
+model Reservation {
+  reservation_id String            @id @default(uuid())
+  slot_id        String
+  license_plate  String
+  start_time     DateTime          @default(now())
+  end_time       DateTime?         // Nullable until completed
+  status         ReservationStatus @default(ACTIVE)
+  created_at     DateTime          @default(now())
+
+  // Relations
+  slot     ParkingSlot      @relation(fields: [slot_id], references: [slot_id])
+  sessions ParkingSession[]
+
+  @@map("reservations")
+}
+
+model ParkingSession {
+  session_id       String        @id @default(uuid())
+  reservation_id   String?       // Nullable (Walk-ins allowed)
+  slot_id          String
+  license_plate    String?       // Might be unknown until OCR scans it
+  entry_time       DateTime      @default(now())
+  exit_time        DateTime?
+  duration_minutes Float?
+  total_fee        Decimal?      @db.Decimal(10, 2)
+  payment_status   PaymentStatus @default(PENDING)
+
+  // Relations
+  slot        ParkingSlot  @relation(fields: [slot_id], references: [slot_id])
+  reservation Reservation? @relation(fields: [reservation_id], references: [reservation_id])
+
+  @@map("parking_sessions")
+}
