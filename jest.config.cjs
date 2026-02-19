@@ -20,4 +20,14 @@ module.exports = {
     ],
   },
   moduleFileExtensions: ['ts', 'js', 'json'],
+
+  // Coverage configuration
+  collectCoverageFrom: [
+    'src/**/*.ts',
+    '!src/config/**',
+    '!src/infrastructure/**',
+    '!src/app.ts',
+  ],
+  coverageDirectory: 'coverage',
+  coverageReporters: ['text', 'text-summary', 'lcov', 'clover'],
 };
