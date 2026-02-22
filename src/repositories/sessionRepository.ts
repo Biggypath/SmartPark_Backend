@@ -8,7 +8,7 @@ export const createSession = async (slotId: string, licensePlate?: string, reser
     data: {
       slot_id: slotId,
       license_plate: licensePlate || "UNKNOWN", // Updated later via OCR
-      reservation_id: reservationId,
+      reservation_id: reservationId ?? null,
       entry_time: new Date(),
       payment_status: 'PENDING'
     }
