@@ -37,6 +37,7 @@ export const reserveParkingSlot = async (slotId: string, licensePlate: string) =
   });
 };
 
+
 export const processEntryEvent = async (slotId: string) => {
     // Logic: When car enters, update status to OCCUPIED
     await prisma.parkingSlot.update({
@@ -62,3 +63,27 @@ export const getParkingDetails = async (licensePlate: string) => {
   };
   return response;
 }
+
+export const cancelReservation = async (reservationId: string) => {
+  // Logic: Cancel reservation and free up the slot
+  return await prisma.$transaction(async (tx) => {
+    const reservation = await tx.reservation.findUnique({ where: { reservation_id: reservationId } });
+    if (!reservation || reservation.status !== 'ACTIVE') {
+      throw new Error('Reservation not found or already inactive.');
+    }
+
+    // Update Reservation Status
+    await tx.reservation.update({
+      where: { reservation_id: reservationId },
+      data: { status: 'CANCELLED' }
+    });
+
+    // Free up the Slot
+    await tx.parkingSlot.update({
+      where: { slot_id: reservation.slot_id },
+      data: { status: 'FREE' }
+    });
+
+    return { message: 'Reservation cancelled successfully.' };
+  });
+};

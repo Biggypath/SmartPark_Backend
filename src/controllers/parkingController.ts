@@ -11,6 +11,7 @@ export const getSlots = async (req: Request, res: Response) => {
 };
 
 export const reserve = async (req: Request, res: Response) => {
+  console.log("Request Body received:", req.body);
   try {
     const { slotId, licensePlate } = req.body;
     const result = await parkingService.reserveParkingSlot(slotId, licensePlate);
@@ -31,5 +32,18 @@ export const getParkingDetails = async (req: Request, res: Response) => {
     res.json(details);
   } catch (error: any) {
     res.status(500).json({ error: 'Internal Server Error', message: error.message });
+  }
+};
+
+export const cancelReserve = async (req: Request, res: Response) => {
+  try {
+    const { reservationId } = req.params;
+    if (typeof reservationId !== 'string') {
+      return res.status(400).json({ error: 'reservationId parameter is required and must be a string.' });
+    }
+    const result = await parkingService.cancelReservation(reservationId);
+    res.json({ success: true, message: 'Reservation cancelled successfully.', data: result });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: error.message });
   }
 };

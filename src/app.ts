@@ -26,10 +26,10 @@ const startServer = async () => {
   // 1. Connect to Database (Prisma connects automatically on first query)
   
   // 2. Connect to RabbitMQ
-  await connectRabbitMQ();
+  // await connectRabbitMQ();
   
-  // 3. Start Listening for IoT Data
-  startSensorConsumer();
+  // // 3. Start Listening for IoT Data
+  // startSensorConsumer();
 
   // 4. Start HTTP Server
   server.listen(PORT, () => {
