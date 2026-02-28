@@ -88,7 +88,7 @@ async function main() {
         data: {
           slot_id: parkingSlots[i]!.slot_id,
           license_plate: `ABC-${1000 + i}`,
-          start_time: new Date(now.getTime() + i * 3600000),
+          reservation_time: new Date(now.getTime() + i * 3600000),
           status: i === 0 ? "ACTIVE" : "COMPLETED",
         },
       })
