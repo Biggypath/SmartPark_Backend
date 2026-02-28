@@ -7,6 +7,7 @@ import type { ConsumeMessage } from 'amqplib';
 interface SensorMessage {
   slotId: string;
   status: 'OCCUPIED' | 'FREE';
+  licensePlate: string; // Optional: If your sensor can read license plates
   timestamp: string;
 }
 
@@ -26,7 +27,7 @@ export const startSensorConsumer = async () => {
         // 2. Business Logic (Check reservations, etc.)
         // We reuse the service logic we wrote earlier!
         if (content.status === 'OCCUPIED') {
-           await parkingService.processEntryEvent(content.slotId);
+           await parkingService.processEntryEvent(content.slotId, content.licensePlate, content.timestamp);
         } else {
            // Handle exit logic if needed
            await prisma.parkingSlot.update({

@@ -1,6 +1,7 @@
 import { prisma } from '../config/db.js';
 import * as slotRepo from '../repositories/slotRepository.js';
 import * as SessionRepo from '../repositories/sessionRepository.js'
+import * as reservationRepo from '../repositories/reservationRepository.js';
 import { calculateExitFee } from './pricingService.js';
 import type { ParkingDetailsResponse } from '../types/index.js';
 
@@ -37,9 +38,19 @@ export const reserveParkingSlot = async (slotId: string, licensePlate: string) =
   });
 };
 
+<<<<<<< Updated upstream
 
 export const processEntryEvent = async (slotId: string) => {
+=======
+export const processEntryEvent = async (slotId: string, licensePlate: string, timestamp: string) => {
+>>>>>>> Stashed changes
     // Logic: When car enters, update status to OCCUPIED
+    const check = await CheckReservation(slotId, licensePlate, new Date(timestamp));
+
+    if (!check) {
+      throw new Error('Reservation check failed. Cannot process entry event.');
+    }
+
     await prisma.parkingSlot.update({
         where: { slot_id: slotId },
         data: { status: 'OCCUPIED' }
@@ -64,6 +75,7 @@ export const getParkingDetails = async (licensePlate: string) => {
   return response;
 }
 
+<<<<<<< Updated upstream
 export const cancelReservation = async (reservationId: string) => {
   // Logic: Cancel reservation and free up the slot
   return await prisma.$transaction(async (tx) => {
@@ -87,3 +99,15 @@ export const cancelReservation = async (reservationId: string) => {
     return { message: 'Reservation cancelled successfully.' };
   });
 };
+=======
+export const CheckReservation = async (slotId: string, licensePlate: string, entryTime: Date) => {
+  const reservation = await reservationRepo.findActiveReservationBySlot(slotId);
+  if (!reservation || reservation.license_plate !== licensePlate) {
+    throw new Error('No active reservation found for this slot and license plate.');
+  }
+  if (reservation.reservation_time > entryTime) {
+    throw new Error('Entry time is before reservation time.');
+  }
+  return true;
+}
+>>>>>>> Stashed changes
