@@ -38,12 +38,7 @@ export const reserveParkingSlot = async (slotId: string, licensePlate: string) =
   });
 };
 
-<<<<<<< Updated upstream
-
-export const processEntryEvent = async (slotId: string) => {
-=======
 export const processEntryEvent = async (slotId: string, licensePlate: string, timestamp: string) => {
->>>>>>> Stashed changes
     // Logic: When car enters, update status to OCCUPIED
     const check = await CheckReservation(slotId, licensePlate, new Date(timestamp));
 
@@ -75,7 +70,6 @@ export const getParkingDetails = async (licensePlate: string) => {
   return response;
 }
 
-<<<<<<< Updated upstream
 export const cancelReservation = async (reservationId: string) => {
   // Logic: Cancel reservation and free up the slot
   return await prisma.$transaction(async (tx) => {
@@ -99,7 +93,6 @@ export const cancelReservation = async (reservationId: string) => {
     return { message: 'Reservation cancelled successfully.' };
   });
 };
-=======
 export const CheckReservation = async (slotId: string, licensePlate: string, entryTime: Date) => {
   const reservation = await reservationRepo.findActiveReservationBySlot(slotId);
   if (!reservation || reservation.license_plate !== licensePlate) {
@@ -110,4 +103,3 @@ export const CheckReservation = async (slotId: string, licensePlate: string, ent
   }
   return true;
 }
->>>>>>> Stashed changes
