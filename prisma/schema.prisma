@@ -1,9 +1,6 @@
 // This is your Prisma schema file,
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -12,11 +9,19 @@ datasource db {
   provider = "postgresql"
 }
 
-// Enums based on your report and diagram
+// ---------------------------------------------------------
+// Enums
+// ---------------------------------------------------------
+
 enum SlotStatus {
   FREE
   OCCUPIED
-  RESERVED
+  ASSIGNED // Slot reserved by the system while the car drives to it
+}
+
+enum SlotType {
+  GENERAL
+  VIP // For privileged cards (SCB First, The 1 Card, etc.)
 }
 
 enum LogEventType {
@@ -25,31 +30,90 @@ enum LogEventType {
   OBSTRUCTION
 }
 
-enum ReservationStatus {
-  ACTIVE
-  CANCELLED
-  COMPLETED
-}
-
 enum PaymentStatus {
   PENDING
   PAID
 }
 
 // ---------------------------------------------------------
-// Models derived from your ER Diagram
+// Identity & Privilege Models
+// ---------------------------------------------------------
+
+model User {
+  user_id       String   @id @default(uuid())
+  email         String   @unique // Used as the login username
+  password_hash String // Stores the encrypted password (e.g., via bcrypt)
+  name          String
+  created_at    DateTime @default(now())
+
+  // Relations: A user can hold multiple different cards
+  cards UserCard[]
+
+  @@map("users")
+}
+
+model PrivilegeProgram {
+  program_id    String  @id @default(uuid())
+  provider_name String // e.g., "SCB First", "The 1 Card"
+  tier          String? // e.g., "Private Banking", "Gold"
+  free_hours    Int     @default(0)
+  max_vehicles  Int     @default(1) // Enforces the card's policy on vehicle limits
+  is_active     Boolean @default(true)
+
+  // Relations: The specific cards issued under this program
+  issued_cards UserCard[]
+
+  @@map("privilege_programs")
+}
+
+model UserCard {
+  card_id    String   @id @default(uuid())
+  user_id    String
+  program_id String
+  issued_at  DateTime @default(now())
+  is_active  Boolean  @default(true)
+
+  // Relations
+  user    User             @relation(fields: [user_id], references: [user_id])
+  program PrivilegeProgram @relation(fields: [program_id], references: [program_id])
+
+  // Many-to-Many: A single card can cover multiple vehicles (up to max_vehicles)
+  vehicles RegisteredVehicle[]
+
+  @@map("user_cards")
+}
+
+model RegisteredVehicle {
+  vehicle_id    String   @id @default(uuid())
+  registration  String // e.g., "1กข 1234"
+  province      String // e.g., "กรุงเทพมหานคร"
+  registered_at DateTime @default(now())
+
+  // Many-to-Many: A single vehicle can be registered under multiple different cards
+  cards UserCard[]
+
+  // Relations: All parking sessions associated with this registered vehicle
+  sessions ParkingSession[]
+
+  // Ensures the combination of number + province is completely unique
+  @@unique([registration, province])
+  @@map("registered_vehicles")
+}
+
+// ---------------------------------------------------------
+// Core Parking Models
 // ---------------------------------------------------------
 
 model ParkingSlot {
-  slot_id             String   @id // e.g. "A1"
-  status              SlotStatus @default(FREE)
-  location_coordinates String   // Stores JSON string "{x:10, y:0, z:5}" for Three.js
-  is_active           Boolean  @default(true) // Hardware availability
+  slot_id              String     @id // e.g. "VIP-A1" or "GEN-B2"
+  slot_type            SlotType   @default(GENERAL)
+  status               SlotStatus @default(FREE)
+  location_coordinates String // Stores JSON string "{x:10, y:0, z:5}" for Three.js
+  is_active            Boolean    @default(true) // Hardware availability
 
   // Relations
-  logs         SensorLog[]
-  reservations Reservation[]
-  sessions     ParkingSession[]
+  logs     SensorLog[]
+  sessions ParkingSession[]
 
   @@map("parking_slots")
 }
@@ -67,34 +131,26 @@ model SensorLog {
   slot_id    String
   timestamp  DateTime     @default(now())
   event_type LogEventType
-  raw_data   String?      // Raw IR sensor value
+  raw_data   String? // Raw IR sensor value from the ESP32
 
   // Relations
-  slot       ParkingSlot  @relation(fields: [slot_id], references: [slot_id])
+  slot ParkingSlot @relation(fields: [slot_id], references: [slot_id])
 
   @@map("sensor_logs")
 }
 
-model Reservation {
-  reservation_id String            @id @default(uuid())
-  slot_id        String
-  license_plate  String
-  reservation_time DateTime        @default(now())
-  status         ReservationStatus @default(ACTIVE)
-  created_at     DateTime          @default(now())
-
-  // Relations
-  slot     ParkingSlot      @relation(fields: [slot_id], references: [slot_id])
-  sessions ParkingSession[]
-
-  @@map("reservations")
-}
-
 model ParkingSession {
-  session_id       String        @id @default(uuid())
-  reservation_id   String?       // Nullable (Walk-ins allowed)
-  slot_id          String
-  license_plate    String?       // Might be unknown until OCR scans it
+  session_id String @id @default(uuid())
+  slot_id    String
+
+  // What the camera actually saw (works for both guests and registered)
+  registration String?
+  province     String?
+
+  // Optional link to a registered vehicle. If null, this is a guest session.
+  vehicle_id String?
+  vehicle    RegisteredVehicle? @relation(fields: [vehicle_id], references: [vehicle_id])
+
   entry_time       DateTime      @default(now())
   exit_time        DateTime?
   duration_minutes Float?
@@ -102,8 +158,7 @@ model ParkingSession {
   payment_status   PaymentStatus @default(PENDING)
 
   // Relations
-  slot        ParkingSlot  @relation(fields: [slot_id], references: [slot_id])
-  reservation Reservation? @relation(fields: [reservation_id], references: [reservation_id])
+  slot ParkingSlot @relation(fields: [slot_id], references: [slot_id])
 
   @@map("parking_sessions")
 }
