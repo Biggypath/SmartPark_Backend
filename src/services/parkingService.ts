@@ -1,105 +1,185 @@
 import { prisma } from '../config/db.js';
 import * as slotRepo from '../repositories/slotRepository.js';
-import * as SessionRepo from '../repositories/sessionRepository.js'
-import * as reservationRepo from '../repositories/reservationRepository.js';
-import { calculateExitFee } from './pricingService.js';
-import type { ParkingDetailsResponse } from '../types/index.js';
+import * as sessionRepo from '../repositories/sessionRepository.js';
+import * as logRepo from '../repositories/logRepository.js';
+import { calculateFee } from './pricingService.js';
 
+/**
+ * Returns all slots for the 3D Digital Twin dashboard.
+ */
 export const getDashboardData = async () => {
   return await slotRepo.getAllSlots();
 };
 
-export const reserveParkingSlot = async (slotId: string, licensePlate: string) => {
-  // LOGIC: Use a Transaction to prevent Race Conditions (Requirement)
+/**
+ * Handle LPR Entry Event:
+ * 1. Look up vehicle in RegisteredVehicle by composite key.
+ * 2. If registered with active cards → prefer VIP slot, fallback to GENERAL.
+ * 3. If guest → assign a GENERAL slot.
+ * 4. Create ParkingSession and mark slot as ASSIGNED.
+ */
+export const handleLprEntry = async (registration: string, province: string) => {
   return await prisma.$transaction(async (tx) => {
-    // 1. Check if slot is truly FREE inside the transaction
-    const slot = await tx.parkingSlot.findUnique({ where: { slot_id: slotId } });
-
-    if (!slot || slot.status !== 'FREE') {
-      throw new Error('Slot is already taken or invalid.');
-    }
-
-    // 2. Update Slot Status
-    await tx.parkingSlot.update({
-      where: { slot_id: slotId },
-      data: { status: 'RESERVED' }
-    });
-
-    // 3. Create Reservation Record
-    const reservation = await tx.reservation.create({
-      data: {
-        slot_id: slotId,
-        license_plate: licensePlate,
-        status: 'ACTIVE'
+    // Look up registered vehicle with active cards
+    const vehicle = await tx.registeredVehicle.findUnique({
+      where: { registration_province: { registration, province } },
+      include: {
+        cards: {
+          where: { is_active: true },
+          include: { program: true }
+        }
       }
     });
 
-    return reservation;
+    const isRegistered = vehicle && vehicle.cards.length > 0;
+    let slot;
+
+    if (isRegistered) {
+      // Prefer VIP, fallback to GENERAL
+      slot = await tx.parkingSlot.findFirst({
+        where: { status: 'FREE', slot_type: 'VIP', is_active: true },
+        orderBy: { slot_id: 'asc' }
+      });
+      if (!slot) {
+        slot = await tx.parkingSlot.findFirst({
+          where: { status: 'FREE', slot_type: 'GENERAL', is_active: true },
+          orderBy: { slot_id: 'asc' }
+        });
+      }
+    } else {
+      // Guest: GENERAL only
+      slot = await tx.parkingSlot.findFirst({
+        where: { status: 'FREE', slot_type: 'GENERAL', is_active: true },
+        orderBy: { slot_id: 'asc' }
+      });
+    }
+
+    if (!slot) {
+      throw new Error('No available parking slots.');
+    }
+
+    // Mark slot as ASSIGNED
+    await tx.parkingSlot.update({
+      where: { slot_id: slot.slot_id },
+      data: { status: 'ASSIGNED' }
+    });
+
+    // Create parking session
+    const session = await tx.parkingSession.create({
+      data: {
+        slot_id: slot.slot_id,
+        registration,
+        province,
+        vehicle_id: vehicle?.vehicle_id ?? null,
+        entry_time: new Date(),
+        payment_status: 'PENDING'
+      }
+    });
+
+    return { session, slot };
   });
 };
 
-export const processEntryEvent = async (slotId: string, licensePlate: string, timestamp: string) => {
-    // Logic: When car enters, update status to OCCUPIED
-    const check = await CheckReservation(slotId, licensePlate, new Date(timestamp));
+/**
+ * Handle Slot Occupation Event (ESP32 IR sensor):
+ * Transition slot from ASSIGNED → OCCUPIED when car physically parks.
+ */
+export const handleSlotOccupation = async (slotId: string, rawData?: string) => {
+  const slot = await slotRepo.findSlotById(slotId);
+  if (!slot) {
+    throw new Error(`Slot ${slotId} not found.`);
+  }
 
-    if (!check) {
-      throw new Error('Reservation check failed. Cannot process entry event.');
-    }
+  if (slot.status !== 'ASSIGNED') {
+    throw new Error(`Slot ${slotId} is not in ASSIGNED state (current: ${slot.status}).`);
+  }
 
-    await prisma.parkingSlot.update({
-        where: { slot_id: slotId },
-        data: { status: 'OCCUPIED' }
-    });
-    // Additional logic: Start a ParkingSession here...
+  // Transition to OCCUPIED
+  await slotRepo.updateSlotStatus(slotId, 'OCCUPIED');
+
+  // Log sensor event
+  await logRepo.createLog(slotId, 'ENTRY', rawData ?? 'IR_TRIGGERED');
+
+  // Verify active session exists
+  const session = await sessionRepo.findActiveSessionBySlot(slotId);
+  return { slot: { ...slot, status: 'OCCUPIED' }, session };
 };
 
-export const getParkingDetails = async (licensePlate: string) => {
-  const slot = await SessionRepo.findActiveSessionByLicensePlate(licensePlate);
-  if (!slot) {
-    throw new Error('No active parking session found for this license plate.');
-  }
-  const fee = await calculateExitFee(slot.session_id);
-  const response: ParkingDetailsResponse = {
-    sessionId: slot.session_id,
-    slotId: slot.slot_id,
-    licensePlate: slot.license_plate!,
-    entryTime: slot.entry_time,
-    currentTime: fee.exitTime,
-    totalFee: fee.fee || 0
-  };
-  return response;
-}
-
-export const cancelReservation = async (reservationId: string) => {
-  // Logic: Cancel reservation and free up the slot
+/**
+ * Handle Slot Exit Event (ESP32 sensor detects car left):
+ * 1. Find active session by slot.
+ * 2. Calculate fee (with privilege free_hours if registered).
+ * 3. Close session, free slot.
+ */
+export const handleSlotExit = async (slotId: string, rawData?: string) => {
   return await prisma.$transaction(async (tx) => {
-    const reservation = await tx.reservation.findUnique({ where: { reservation_id: reservationId } });
-    if (!reservation || reservation.status !== 'ACTIVE') {
-      throw new Error('Reservation not found or already inactive.');
-    }
-
-    // Update Reservation Status
-    await tx.reservation.update({
-      where: { reservation_id: reservationId },
-      data: { status: 'CANCELLED' }
+    // Find active session by slot
+    const session = await tx.parkingSession.findFirst({
+      where: { slot_id: slotId, exit_time: null }
     });
 
-    // Free up the Slot
+    if (!session) {
+      throw new Error(`No active parking session found for slot ${slotId}.`);
+    }
+
+    const now = new Date();
+
+    // Determine free hours from privilege cards
+    let freeHours = 0;
+    if (session.vehicle_id) {
+      const vehicle = await tx.registeredVehicle.findUnique({
+        where: { vehicle_id: session.vehicle_id },
+        include: {
+          cards: {
+            where: { is_active: true },
+            include: { program: { select: { free_hours: true, is_active: true } } }
+          }
+        }
+      });
+
+      if (vehicle?.cards) {
+        // Conflict resolution: pick the card with the highest free_hours
+        for (const card of vehicle.cards) {
+          if (card.program.is_active && card.program.free_hours > freeHours) {
+            freeHours = card.program.free_hours;
+          }
+        }
+      }
+    }
+
+    // Calculate fee
+    const feeResult = calculateFee(session.entry_time, now, freeHours);
+
+    // Close session
+    await tx.parkingSession.update({
+      where: { session_id: session.session_id },
+      data: {
+        exit_time: now,
+        duration_minutes: feeResult.durationMinutes,
+        total_fee: feeResult.totalFee,
+        payment_status: feeResult.totalFee > 0 ? 'PENDING' : 'PAID'
+      }
+    });
+
+    // Free the slot
     await tx.parkingSlot.update({
-      where: { slot_id: reservation.slot_id },
+      where: { slot_id: session.slot_id },
       data: { status: 'FREE' }
     });
 
-    return { message: 'Reservation cancelled successfully.' };
+    // Log sensor event
+    await tx.sensorLog.create({
+      data: {
+        slot_id: session.slot_id,
+        event_type: 'EXIT',
+        raw_data: rawData ?? 'IR_DEPARTED'
+      }
+    });
+
+    return {
+      sessionId: session.session_id,
+      slotId: session.slot_id,
+      ...feeResult
+    };
   });
 };
-export const CheckReservation = async (slotId: string, licensePlate: string, entryTime: Date) => {
-  const reservation = await reservationRepo.findActiveReservationBySlot(slotId);
-  if (!reservation || reservation.license_plate !== licensePlate) {
-    throw new Error('No active reservation found for this slot and license plate.');
-  }
-  if (reservation.reservation_time > entryTime) {
-    throw new Error('Entry time is before reservation time.');
-  }
-  return true;
-}

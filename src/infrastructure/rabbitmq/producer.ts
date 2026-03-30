@@ -1,8 +1,7 @@
-import { getChannel } from './connection.js';
+import { getChannel, QUEUES } from './connection.js';
 
 export const sendGateCommand = async (gateId: string, command: 'OPEN' | 'CLOSE') => {
   const channel = getChannel();
-  const queue = 'gate_commands';
 
   const message = JSON.stringify({
     gateId,
@@ -10,6 +9,6 @@ export const sendGateCommand = async (gateId: string, command: 'OPEN' | 'CLOSE')
     timestamp: new Date().toISOString()
   });
 
-  channel.sendToQueue(queue, Buffer.from(message), { persistent: true });
-  console.log(`🚀 Sent Command: ${command} to ${gateId}`);
+  channel.sendToQueue(QUEUES.GATE_COMMANDS, Buffer.from(message), { persistent: true });
+  console.log(`Sent Gate Command: ${command} to ${gateId}`);
 };

@@ -1,5 +1,5 @@
 import { prisma } from '../config/db.js';
-import { SlotStatus } from '@prisma/client';
+import type { SlotStatus, SlotType } from '@prisma/client';
 
 export const getAllSlots = async () => {
   return prisma.parkingSlot.findMany({
@@ -15,5 +15,16 @@ export const updateSlotStatus = async (slotId: string, status: SlotStatus) => {
   return prisma.parkingSlot.update({
     where: { slot_id: slotId },
     data: { status }
+  });
+};
+
+export const findFreeSlotByType = async (slotType: SlotType) => {
+  return prisma.parkingSlot.findFirst({
+    where: {
+      status: 'FREE',
+      slot_type: slotType,
+      is_active: true
+    },
+    orderBy: { slot_id: 'asc' }
   });
 };

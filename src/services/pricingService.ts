@@ -1,20 +1,39 @@
 import { prisma } from '../config/db.js';
+import type { ExitFeeResult } from '../types/index.js';
 
-export const calculateExitFee = async (sessionId: string) => {
-  const session = await prisma.parkingSession.findUnique({ where: { session_id: sessionId } });
-  if (!session) throw new Error("Session not found");
+/**
+ * Get the current active pricing rate.
+ */
+export const getActiveRate = async (): Promise<number> => {
+  const rule = await prisma.pricingRule.findFirst({
+    orderBy: { effective_from: 'desc' }
+  });
+  return rule ? rule.rate_per_hour : 20.0;
+};
 
-  const now = new Date();
-  const durationMs = now.getTime() - session.entry_time.getTime();
-  const durationHours = Math.ceil(durationMs / (1000 * 60 * 60)); // Round up
+/**
+ * Calculate parking fee given entry time, exit time, and privilege free hours.
+ * Pure calculation — no DB calls.
+ */
+export const calculateFee = (
+  entryTime: Date,
+  exitTime: Date,
+  freeHours: number = 0,
+  ratePerHour: number = 20.0
+): ExitFeeResult => {
+  const durationMs = exitTime.getTime() - entryTime.getTime();
+  const durationMinutes = durationMs / 60000;
+  const durationHours = durationMs / (1000 * 60 * 60);
 
-  // Get current rate
-  const rule = await prisma.pricingRule.findFirst({ orderBy: { effective_from: 'desc' } });
-  const rate = rule ? rule.rate_per_hour : 20.0;
+  const billableHours = Math.max(0, Math.ceil(durationHours) - freeHours);
+  const totalFee = billableHours * ratePerHour;
 
   return {
-    durationMinutes: durationMs / 60000,
-    fee: durationHours * rate,
-    exitTime: now
+    durationMinutes,
+    freeHours,
+    billableHours,
+    ratePerHour,
+    totalFee,
+    exitTime
   };
 };

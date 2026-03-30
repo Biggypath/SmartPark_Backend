@@ -1,35 +1,24 @@
 // src/types/index.ts
 
-// 1. Request Object for Reservation (What React sends)
-export interface CreateReservationDTO {
+// 1. LPR Camera Events (from LPR server via RabbitMQ)
+export interface LprEntryEvent {
+  registration: string;  // e.g. "1กข 1234"
+  province: string;      // e.g. "กรุงเทพมหานคร"
+}
+
+// 2. ESP32 Sensor Events (from IoT hardware via RabbitMQ)
+export interface SensorSlotEvent {
   slotId: string;
-  licensePlate: string;
-  durationHours?: number; // Optional user input
-}
-
-// 2. Response Object for Fee Calculation (What React receives)
-export interface ExitFeeResponse {
-  sessionId: string;
-  entryTime: Date;
-  exitTime: Date;
-  durationMinutes: number;
-  totalFee: number;
-  currency: string;
-}
-
-export interface ParkingDetailsResponse {
-  sessionId: string;
-  slotId: string;
-  licensePlate: string;
-  entryTime: Date;
-  currentTime: Date;
-  // currentStatus: 'PENDING' | 'PAID';
-  totalFee: number; 
-}
-
-// 3. MQTT Payload Structure (What ESP32 sends)
-export interface SensorPayload {
-  slot_id: string;
   status: 'OCCUPIED' | 'FREE';
-  distance_cm?: number;
+  rawData?: string;      // Raw IR sensor value
+}
+
+// 3. Response Object for Fee Calculation
+export interface ExitFeeResult {
+  durationMinutes: number;
+  freeHours: number;
+  billableHours: number;
+  ratePerHour: number;
+  totalFee: number;
+  exitTime: Date;
 }
