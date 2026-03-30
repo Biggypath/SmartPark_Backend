@@ -18,50 +18,66 @@ describe('sessionRepository', () => {
   });
 
   describe('createSession', () => {
-    it('should create a session with all details', async () => {
+    it('should create a session for a registered vehicle', async () => {
       const mockSession = {
         session_id: 'sess-1',
-        slot_id: 'A1',
-        license_plate: 'ABC123',
-        reservation_id: 'res-1',
+        slot_id: 'VIP-A1',
+        registration: '1กข 1234',
+        province: 'กรุงเทพมหานคร',
+        vehicle_id: 'v-1',
         entry_time: new Date(),
         payment_status: 'PENDING',
       };
       mockPrisma.parkingSession.create.mockResolvedValue(mockSession);
 
-      const result = await sessionRepo.createSession('A1', 'ABC123', 'res-1');
+      const result = await sessionRepo.createSession({
+        slotId: 'VIP-A1',
+        registration: '1กข 1234',
+        province: 'กรุงเทพมหานคร',
+        vehicleId: 'v-1',
+      });
 
       expect(result).toEqual(mockSession);
       expect(mockPrisma.parkingSession.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
-          slot_id: 'A1',
-          license_plate: 'ABC123',
-          reservation_id: 'res-1',
+          slot_id: 'VIP-A1',
+          registration: '1กข 1234',
+          province: 'กรุงเทพมหานคร',
+          vehicle_id: 'v-1',
           payment_status: 'PENDING',
         }),
       });
     });
 
-    it('should use "UNKNOWN" for missing license plate', async () => {
+    it('should create a session for a guest (no vehicle_id)', async () => {
       mockPrisma.parkingSession.create.mockResolvedValue({});
 
-      await sessionRepo.createSession('A1');
+      await sessionRepo.createSession({
+        slotId: 'GEN-A1',
+        registration: '2ขค 5678',
+        province: 'เชียงใหม่',
+      });
 
       expect(mockPrisma.parkingSession.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
-          license_plate: 'UNKNOWN',
+          slot_id: 'GEN-A1',
+          registration: '2ขค 5678',
+          province: 'เชียงใหม่',
+          vehicle_id: null,
         }),
       });
     });
 
-    it('should set reservationId to undefined when not provided', async () => {
+    it('should set null for missing registration and province', async () => {
       mockPrisma.parkingSession.create.mockResolvedValue({});
 
-      await sessionRepo.createSession('A1', 'ABC123');
+      await sessionRepo.createSession({ slotId: 'GEN-A1' });
 
       expect(mockPrisma.parkingSession.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
-          reservation_id: undefined,
+          registration: null,
+          province: null,
+          vehicle_id: null,
         }),
       });
     });
@@ -69,21 +85,21 @@ describe('sessionRepository', () => {
 
   describe('findActiveSessionBySlot', () => {
     it('should find active session for a slot', async () => {
-      const mockSession = { session_id: 'sess-1', slot_id: 'A1', exit_time: null };
+      const mockSession = { session_id: 'sess-1', slot_id: 'VIP-A1', exit_time: null };
       mockPrisma.parkingSession.findFirst.mockResolvedValue(mockSession);
 
-      const result = await sessionRepo.findActiveSessionBySlot('A1');
+      const result = await sessionRepo.findActiveSessionBySlot('VIP-A1');
 
       expect(result).toEqual(mockSession);
       expect(mockPrisma.parkingSession.findFirst).toHaveBeenCalledWith({
-        where: { slot_id: 'A1', exit_time: null },
+        where: { slot_id: 'VIP-A1', exit_time: null },
       });
     });
 
     it('should return null when no active session exists', async () => {
       mockPrisma.parkingSession.findFirst.mockResolvedValue(null);
 
-      const result = await sessionRepo.findActiveSessionBySlot('A1');
+      const result = await sessionRepo.findActiveSessionBySlot('GEN-A1');
 
       expect(result).toBeNull();
     });
@@ -91,7 +107,7 @@ describe('sessionRepository', () => {
 
   describe('updateSessionExit', () => {
     it('should update session with exit details', async () => {
-      const exitTime = new Date('2026-02-19T14:00:00Z');
+      const exitTime = new Date('2026-03-30T14:00:00Z');
       const mockUpdated = {
         session_id: 'sess-1',
         exit_time: exitTime,
@@ -113,32 +129,6 @@ describe('sessionRepository', () => {
           payment_status: 'PAID',
         },
       });
-    });
-  });
-
-  describe('findActiveSessionByLicensePlate', () => {
-    it('should find active session by license plate', async () => {
-      const mockSession = {
-        session_id: 'sess-1',
-        license_plate: 'ABC123',
-        exit_time: null,
-      };
-      mockPrisma.parkingSession.findFirst.mockResolvedValue(mockSession);
-
-      const result = await sessionRepo.findActiveSessionByLicensePlate('ABC123');
-
-      expect(result).toEqual(mockSession);
-      expect(mockPrisma.parkingSession.findFirst).toHaveBeenCalledWith({
-        where: { license_plate: 'ABC123', exit_time: null },
-      });
-    });
-
-    it('should return null when no active session for plate', async () => {
-      mockPrisma.parkingSession.findFirst.mockResolvedValue(null);
-
-      const result = await sessionRepo.findActiveSessionByLicensePlate('XYZ999');
-
-      expect(result).toBeNull();
     });
   });
 });

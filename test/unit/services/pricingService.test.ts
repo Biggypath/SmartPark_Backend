@@ -1,7 +1,4 @@
 const mockPrisma = {
-  parkingSession: {
-    findUnique: jest.fn(),
-  },
   pricingRule: {
     findFirst: jest.fn(),
   },
@@ -11,114 +8,113 @@ jest.mock('../../../src/config/db', () => ({
   prisma: mockPrisma,
 }));
 
-import { calculateExitFee } from '../../../src/services/pricingService';
+import { calculateFee, getActiveRate } from '../../../src/services/pricingService';
 
 describe('pricingService', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    jest.useRealTimers();
   });
 
-  describe('calculateExitFee', () => {
-    it('should calculate fee with custom rate', async () => {
-      jest.useFakeTimers();
-      jest.setSystemTime(new Date('2026-02-19T12:30:00Z'));
+  describe('calculateFee', () => {
+    it('should calculate fee with custom rate, no free hours', () => {
+      const entry = new Date('2026-03-30T10:00:00Z');
+      const exit = new Date('2026-03-30T12:30:00Z');
 
-      mockPrisma.parkingSession.findUnique.mockResolvedValue({
-        session_id: 'sess-1',
-        entry_time: new Date('2026-02-19T10:00:00Z'),
-      });
-      mockPrisma.pricingRule.findFirst.mockResolvedValue({
-        rate_per_hour: 25.0,
-      });
+      const result = calculateFee(entry, exit, 0, 25);
 
-      const result = await calculateExitFee('sess-1');
-
-      // Duration: 2h 30m → ceil to 3 hours → 3 * 25 = 75
-      expect(result.fee).toBe(75);
+      // 2h30m → ceil to 3h → 3 * 25 = 75
+      expect(result.totalFee).toBe(75);
       expect(result.durationMinutes).toBe(150);
-      expect(result.exitTime).toEqual(new Date('2026-02-19T12:30:00Z'));
+      expect(result.billableHours).toBe(3);
+      expect(result.freeHours).toBe(0);
+      expect(result.ratePerHour).toBe(25);
     });
 
-    it('should use default rate of 20 when no pricing rule exists', async () => {
-      jest.useFakeTimers();
-      jest.setSystemTime(new Date('2026-02-19T11:00:00Z'));
+    it('should use default rate of 20 when not specified', () => {
+      const entry = new Date('2026-03-30T10:00:00Z');
+      const exit = new Date('2026-03-30T11:00:00Z');
 
-      mockPrisma.parkingSession.findUnique.mockResolvedValue({
-        session_id: 'sess-1',
-        entry_time: new Date('2026-02-19T10:00:00Z'),
-      });
-      mockPrisma.pricingRule.findFirst.mockResolvedValue(null);
+      const result = calculateFee(entry, exit);
 
-      const result = await calculateExitFee('sess-1');
-
-      // 1 hour * 20 (default rate)
-      expect(result.fee).toBe(20);
+      // 1 hour * 20 (default)
+      expect(result.totalFee).toBe(20);
       expect(result.durationMinutes).toBe(60);
     });
 
-    it('should round up partial hours', async () => {
-      jest.useFakeTimers();
-      jest.setSystemTime(new Date('2026-02-19T10:15:00Z'));
+    it('should subtract free hours from billable duration', () => {
+      const entry = new Date('2026-03-30T10:00:00Z');
+      const exit = new Date('2026-03-30T13:00:00Z');
 
-      mockPrisma.parkingSession.findUnique.mockResolvedValue({
-        session_id: 'sess-1',
-        entry_time: new Date('2026-02-19T10:00:00Z'),
-      });
-      mockPrisma.pricingRule.findFirst.mockResolvedValue({
-        rate_per_hour: 10.0,
-      });
+      const result = calculateFee(entry, exit, 2, 20);
 
-      const result = await calculateExitFee('sess-1');
+      // 3 hours parked - 2 free hours = 1 billable hour → 1 * 20 = 20
+      expect(result.totalFee).toBe(20);
+      expect(result.billableHours).toBe(1);
+      expect(result.freeHours).toBe(2);
+    });
 
-      // 15 minutes → ceil to 1 hour → 1 * 10 = 10
-      expect(result.fee).toBe(10);
+    it('should not produce negative fee when free hours exceed duration', () => {
+      const entry = new Date('2026-03-30T10:00:00Z');
+      const exit = new Date('2026-03-30T11:00:00Z');
+
+      const result = calculateFee(entry, exit, 5, 20);
+
+      // 1 hour - 5 free hours → max(0, -4) = 0 billable
+      expect(result.totalFee).toBe(0);
+      expect(result.billableHours).toBe(0);
+    });
+
+    it('should round up partial hours before subtracting free hours', () => {
+      const entry = new Date('2026-03-30T10:00:00Z');
+      const exit = new Date('2026-03-30T10:15:00Z');
+
+      const result = calculateFee(entry, exit, 0, 10);
+
+      // 15 min → ceil to 1h → 1 * 10 = 10
+      expect(result.totalFee).toBe(10);
       expect(result.durationMinutes).toBe(15);
+      expect(result.billableHours).toBe(1);
     });
 
-    it('should handle exactly 1 hour duration', async () => {
-      jest.useFakeTimers();
-      jest.setSystemTime(new Date('2026-02-19T11:00:00Z'));
+    it('should handle exactly the free hours duration', () => {
+      const entry = new Date('2026-03-30T10:00:00Z');
+      const exit = new Date('2026-03-30T12:00:00Z');
 
-      mockPrisma.parkingSession.findUnique.mockResolvedValue({
-        session_id: 'sess-1',
-        entry_time: new Date('2026-02-19T10:00:00Z'),
-      });
-      mockPrisma.pricingRule.findFirst.mockResolvedValue({
-        rate_per_hour: 30.0,
-      });
+      const result = calculateFee(entry, exit, 2, 20);
 
-      const result = await calculateExitFee('sess-1');
-
-      expect(result.fee).toBe(30);
-      expect(result.durationMinutes).toBe(60);
+      // 2 hours - 2 free = 0 billable
+      expect(result.totalFee).toBe(0);
+      expect(result.billableHours).toBe(0);
     });
 
-    it('should throw error if session not found', async () => {
-      mockPrisma.parkingSession.findUnique.mockResolvedValue(null);
+    it('should return the exit time passed', () => {
+      const entry = new Date('2026-03-30T10:00:00Z');
+      const exit = new Date('2026-03-30T11:00:00Z');
 
-      await expect(calculateExitFee('nonexistent')).rejects.toThrow(
-        'Session not found'
-      );
+      const result = calculateFee(entry, exit);
+
+      expect(result.exitTime).toEqual(exit);
     });
+  });
 
-    it('should query the latest pricing rule', async () => {
-      jest.useFakeTimers();
-      jest.setSystemTime(new Date('2026-02-19T11:00:00Z'));
+  describe('getActiveRate', () => {
+    it('should return rate from latest pricing rule', async () => {
+      mockPrisma.pricingRule.findFirst.mockResolvedValue({ rate_per_hour: 25.0 });
 
-      mockPrisma.parkingSession.findUnique.mockResolvedValue({
-        session_id: 'sess-1',
-        entry_time: new Date('2026-02-19T10:00:00Z'),
-      });
-      mockPrisma.pricingRule.findFirst.mockResolvedValue({
-        rate_per_hour: 15.0,
-      });
+      const rate = await getActiveRate();
 
-      await calculateExitFee('sess-1');
-
+      expect(rate).toBe(25.0);
       expect(mockPrisma.pricingRule.findFirst).toHaveBeenCalledWith({
         orderBy: { effective_from: 'desc' },
       });
+    });
+
+    it('should return default rate of 20 when no rule exists', async () => {
+      mockPrisma.pricingRule.findFirst.mockResolvedValue(null);
+
+      const rate = await getActiveRate();
+
+      expect(rate).toBe(20.0);
     });
   });
 });
