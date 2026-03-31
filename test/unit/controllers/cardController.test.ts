@@ -1,4 +1,5 @@
 jest.mock('../../../src/services/cardService.js', () => ({
+  getCards: jest.fn(),
   addCard: jest.fn(),
   updateCard: jest.fn(),
   deleteCard: jest.fn(),
@@ -21,6 +22,30 @@ const mockRes = () => {
 describe('cardController', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+  });
+
+  describe('getCards', () => {
+    it('should return 200 with cards list', async () => {
+      const req = { user: { user_id: 'u1' } } as AuthRequest;
+      const res = mockRes();
+      const cards = [{ card_id: 'c1' }, { card_id: 'c2' }];
+      mockCardService.getCards.mockResolvedValue(cards as any);
+
+      await cardController.getCards(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(200);
+      expect(res.json).toHaveBeenCalledWith(cards);
+    });
+
+    it('should return 400 on error', async () => {
+      const req = { user: { user_id: 'u1' } } as AuthRequest;
+      const res = mockRes();
+      mockCardService.getCards.mockRejectedValue(new Error('Failed'));
+
+      await cardController.getCards(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(400);
+    });
   });
 
   describe('addCard', () => {

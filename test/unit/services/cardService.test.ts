@@ -1,6 +1,7 @@
 jest.mock('../../../src/repositories/cardRepository.js', () => ({
   createCard: jest.fn(),
   findCardById: jest.fn(),
+  findCardsByUserId: jest.fn(),
   updateCard: jest.fn(),
   deleteCard: jest.fn(),
 }));
@@ -13,6 +14,18 @@ const mockCardRepo = cardRepo as jest.Mocked<typeof cardRepo>;
 describe('cardService', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+  });
+
+  describe('getCards', () => {
+    it('should return all cards for the user', async () => {
+      const mockCards = [{ card_id: 'c1' }, { card_id: 'c2' }] as any;
+      mockCardRepo.findCardsByUserId.mockResolvedValue(mockCards);
+
+      const result = await cardService.getCards('u1');
+
+      expect(result).toEqual(mockCards);
+      expect(mockCardRepo.findCardsByUserId).toHaveBeenCalledWith('u1');
+    });
   });
 
   describe('addCard', () => {

@@ -1,6 +1,7 @@
 jest.mock('../../../src/repositories/vehicleRepository.js', () => ({
   createVehicle: jest.fn(),
   findVehicleById: jest.fn(),
+  findVehiclesByUserId: jest.fn(),
   updateVehicle: jest.fn(),
   deleteVehicle: jest.fn(),
 }));
@@ -20,6 +21,18 @@ const mockCardRepo = cardRepo as jest.Mocked<typeof cardRepo>;
 describe('vehicleService', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+  });
+
+  describe('getVehicles', () => {
+    it('should return vehicles for the user', async () => {
+      const mockVehicles = [{ vehicle_id: 'v1' }] as any;
+      mockVehicleRepo.findVehiclesByUserId.mockResolvedValue(mockVehicles);
+
+      const result = await vehicleService.getVehicles('u1');
+
+      expect(result).toEqual(mockVehicles);
+      expect(mockVehicleRepo.findVehiclesByUserId).toHaveBeenCalledWith('u1');
+    });
   });
 
   describe('registerVehicle', () => {

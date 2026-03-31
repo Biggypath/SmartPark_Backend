@@ -2,6 +2,7 @@ const mockPrisma = {
   registeredVehicle: {
     create: jest.fn(),
     findUnique: jest.fn(),
+    findMany: jest.fn(),
     update: jest.fn(),
     delete: jest.fn(),
   },
@@ -100,6 +101,21 @@ describe('vehicleRepository', () => {
       expect(mockPrisma.registeredVehicle.update).toHaveBeenCalledWith({
         where: { vehicle_id: 'v1' },
         data: { registration: 'ABC', province: 'CNX' },
+        include: { cards: true },
+      });
+    });
+  });
+
+  describe('findVehiclesByUserId', () => {
+    it('should return vehicles linked to user cards', async () => {
+      const mockVehicles = [{ vehicle_id: 'v1', cards: [{ card_id: 'c1' }] }];
+      mockPrisma.registeredVehicle.findMany.mockResolvedValue(mockVehicles);
+
+      const result = await vehicleRepo.findVehiclesByUserId('u1');
+
+      expect(result).toEqual(mockVehicles);
+      expect(mockPrisma.registeredVehicle.findMany).toHaveBeenCalledWith({
+        where: { cards: { some: { user_id: 'u1' } } },
         include: { cards: true },
       });
     });

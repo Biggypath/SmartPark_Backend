@@ -1,4 +1,5 @@
 jest.mock('../../../src/services/vehicleService.js', () => ({
+  getVehicles: jest.fn(),
   registerVehicle: jest.fn(),
   updateVehicle: jest.fn(),
   deleteVehicle: jest.fn(),
@@ -21,6 +22,30 @@ const mockRes = () => {
 describe('vehicleController', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+  });
+
+  describe('getVehicles', () => {
+    it('should return 200 with vehicles list', async () => {
+      const req = { user: { user_id: 'u1' } } as AuthRequest;
+      const res = mockRes();
+      const vehicles = [{ vehicle_id: 'v1' }];
+      mockVehicleService.getVehicles.mockResolvedValue(vehicles as any);
+
+      await vehicleController.getVehicles(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(200);
+      expect(res.json).toHaveBeenCalledWith(vehicles);
+    });
+
+    it('should return 400 on error', async () => {
+      const req = { user: { user_id: 'u1' } } as AuthRequest;
+      const res = mockRes();
+      mockVehicleService.getVehicles.mockRejectedValue(new Error('Failed'));
+
+      await vehicleController.getVehicles(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(400);
+    });
   });
 
   describe('registerVehicle', () => {

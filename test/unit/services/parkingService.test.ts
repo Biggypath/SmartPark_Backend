@@ -16,6 +16,7 @@ jest.mock('../../../src/repositories/slotRepository.js', () => ({
 jest.mock('../../../src/repositories/sessionRepository.js', () => ({
   createSession: jest.fn(),
   findActiveSessionBySlot: jest.fn(),
+  findActiveSessionByPlate: jest.fn(),
   updateSessionExit: jest.fn(),
 }));
 
@@ -32,6 +33,7 @@ const mockedGetAllSlots = slotRepo.getAllSlots as jest.MockedFunction<typeof slo
 const mockedFindSlotById = slotRepo.findSlotById as jest.MockedFunction<typeof slotRepo.findSlotById>;
 const mockedUpdateSlotStatus = slotRepo.updateSlotStatus as jest.MockedFunction<typeof slotRepo.updateSlotStatus>;
 const mockedFindActiveBySlot = sessionRepo.findActiveSessionBySlot as jest.MockedFunction<typeof sessionRepo.findActiveSessionBySlot>;
+const mockedFindActiveByPlate = sessionRepo.findActiveSessionByPlate as jest.MockedFunction<typeof sessionRepo.findActiveSessionByPlate>;
 const mockedCreateLog = logRepo.createLog as jest.MockedFunction<typeof logRepo.createLog>;
 
 describe('parkingService', () => {
@@ -522,6 +524,102 @@ describe('parkingService', () => {
           raw_data: 'distance:>30cm',
         }),
       });
+    });
+  });
+
+  describe('checkSession', () => {
+    it('should return null when no active session found', async () => {
+      mockedFindActiveByPlate.mockResolvedValue(null);
+
+      const result = await parkingService.checkSession('9ZZ 0000', 'ชลบุรี');
+
+      expect(result).toBeNull();
+      expect(mockedFindActiveByPlate).toHaveBeenCalledWith('9ZZ 0000', 'ชลบุรี');
+    });
+
+    it('should return session details for a guest vehicle', async () => {
+      const entryTime = new Date(Date.now() - 60 * 60 * 1000); // 1 hour ago
+      mockedFindActiveByPlate.mockResolvedValue({
+        session_id: 'sess-1',
+        slot_id: 'GEN-A1',
+        registration: '2ขค 5678',
+        province: 'เชียงใหม่',
+        vehicle_id: null,
+        vehicle: null,
+        entry_time: entryTime,
+        exit_time: null,
+        duration_minutes: null,
+        total_fee: null,
+        payment_status: 'PENDING',
+        slot: { slot_id: 'GEN-A1', slot_type: 'GENERAL', status: 'OCCUPIED', location_coordinates: '{}', is_active: true },
+      } as any);
+
+      const result = await parkingService.checkSession('2ขค 5678', 'เชียงใหม่');
+
+      expect(result).not.toBeNull();
+      expect(result!.is_registered).toBe(false);
+      expect(result!.free_hours).toBe(0);
+      expect(result!.slot.slot_type).toBe('GENERAL');
+      expect(result!.estimated_fee).toBeGreaterThanOrEqual(0);
+    });
+
+    it('should return session details with free hours for a registered vehicle', async () => {
+      const entryTime = new Date(Date.now() - 2 * 60 * 60 * 1000); // 2 hours ago
+      mockedFindActiveByPlate.mockResolvedValue({
+        session_id: 'sess-2',
+        slot_id: 'VIP-A1',
+        registration: '1กข 1234',
+        province: 'กรุงเทพมหานคร',
+        vehicle_id: 'v-1',
+        vehicle: {
+          vehicle_id: 'v-1',
+          cards: [
+            { is_active: true, program: { free_hours: 5, is_active: true } },
+            { is_active: true, program: { free_hours: 2, is_active: true } },
+          ],
+        },
+        entry_time: entryTime,
+        exit_time: null,
+        duration_minutes: null,
+        total_fee: null,
+        payment_status: 'PENDING',
+        slot: { slot_id: 'VIP-A1', slot_type: 'VIP', status: 'OCCUPIED', location_coordinates: '{}', is_active: true },
+      } as any);
+
+      const result = await parkingService.checkSession('1กข 1234', 'กรุงเทพมหานคร');
+
+      expect(result).not.toBeNull();
+      expect(result!.is_registered).toBe(true);
+      expect(result!.free_hours).toBe(5); // Picks the highest
+      expect(result!.slot.slot_type).toBe('VIP');
+    });
+
+    it('should pick highest free_hours among active cards', async () => {
+      const entryTime = new Date(Date.now() - 30 * 60 * 1000); // 30 min ago
+      mockedFindActiveByPlate.mockResolvedValue({
+        session_id: 'sess-3',
+        slot_id: 'VIP-B1',
+        registration: '3คง 9999',
+        province: 'นครราชสีมา',
+        vehicle_id: 'v-2',
+        vehicle: {
+          vehicle_id: 'v-2',
+          cards: [
+            { is_active: true, program: { free_hours: 3, is_active: true } },
+            { is_active: true, program: { free_hours: 0, is_active: false } },
+          ],
+        },
+        entry_time: entryTime,
+        exit_time: null,
+        duration_minutes: null,
+        total_fee: null,
+        payment_status: 'PENDING',
+        slot: { slot_id: 'VIP-B1', slot_type: 'VIP', status: 'OCCUPIED', location_coordinates: '{}', is_active: true },
+      } as any);
+
+      const result = await parkingService.checkSession('3คง 9999', 'นครราชสีมา');
+
+      expect(result!.free_hours).toBe(3); // Inactive program ignored
     });
   });
 });

@@ -105,6 +105,52 @@ describe('sessionRepository', () => {
     });
   });
 
+  describe('findActiveSessionByPlate', () => {
+    it('should find active session with slot and vehicle details', async () => {
+      const mockSession = {
+        session_id: 'sess-1',
+        registration: '1กข 1234',
+        province: 'กรุงเทพมหานคร',
+        exit_time: null,
+        slot: { slot_id: 'VIP-A1', slot_type: 'VIP', status: 'OCCUPIED' },
+        vehicle: {
+          cards: [{ is_active: true, program: { free_hours: 5 } }],
+        },
+      };
+      mockPrisma.parkingSession.findFirst.mockResolvedValue(mockSession);
+
+      const result = await sessionRepo.findActiveSessionByPlate('1กข 1234', 'กรุงเทพมหานคร');
+
+      expect(result).toEqual(mockSession);
+      expect(mockPrisma.parkingSession.findFirst).toHaveBeenCalledWith({
+        where: {
+          registration: '1กข 1234',
+          province: 'กรุงเทพมหานคร',
+          exit_time: null,
+        },
+        include: {
+          slot: true,
+          vehicle: {
+            include: {
+              cards: {
+                where: { is_active: true },
+                include: { program: true },
+              },
+            },
+          },
+        },
+      });
+    });
+
+    it('should return null when no active session for plate', async () => {
+      mockPrisma.parkingSession.findFirst.mockResolvedValue(null);
+
+      const result = await sessionRepo.findActiveSessionByPlate('9ZZ 0000', 'ชลบุรี');
+
+      expect(result).toBeNull();
+    });
+  });
+
   describe('updateSessionExit', () => {
     it('should update session with exit details', async () => {
       const exitTime = new Date('2026-03-30T14:00:00Z');
