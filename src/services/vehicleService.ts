@@ -1,6 +1,10 @@
 import * as vehicleRepo from '../repositories/vehicleRepository.js';
 import * as cardRepo from '../repositories/cardRepository.js';
 
+export const getVehicles = async (userId: string) => {
+  return vehicleRepo.findVehiclesByUserId(userId);
+};
+
 export const registerVehicle = async (
   userId: string,
   registration: string,

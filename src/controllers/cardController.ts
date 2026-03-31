@@ -2,6 +2,17 @@ import type { Response } from 'express';
 import type { AuthRequest } from '../types/index.js';
 import * as cardService from '../services/cardService.js';
 
+export const getCards = async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user!.user_id;
+    const cards = await cardService.getCards(userId);
+    res.status(200).json(cards);
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Failed to get cards.';
+    res.status(400).json({ error: message });
+  }
+};
+
 export const addCard = async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user!.user_id;

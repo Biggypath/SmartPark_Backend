@@ -30,6 +30,28 @@ export const findActiveSessionBySlot = async (slotId: string) => {
   });
 };
 
+// 2b. Find Active Session by License Plate (for session check endpoint)
+export const findActiveSessionByPlate = async (registration: string, province: string) => {
+  return prisma.parkingSession.findFirst({
+    where: {
+      registration,
+      province,
+      exit_time: null
+    },
+    include: {
+      slot: true,
+      vehicle: {
+        include: {
+          cards: {
+            where: { is_active: true },
+            include: { program: true }
+          }
+        }
+      }
+    }
+  });
+};
+
 // 3. End Session (Car Exits)
 export const updateSessionExit = async (
   sessionId: string,

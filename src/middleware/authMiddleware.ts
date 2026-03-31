@@ -1,7 +1,6 @@
 import type { Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import type { AuthRequest } from '../types/index.js';
-import { Types } from '@prisma/client/runtime/client';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'smartpark-secret';
 

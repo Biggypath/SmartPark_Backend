@@ -2,6 +2,17 @@ import type { Response } from 'express';
 import type { AuthRequest } from '../types/index.js';
 import * as vehicleService from '../services/vehicleService.js';
 
+export const getVehicles = async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user!.user_id;
+    const vehicles = await vehicleService.getVehicles(userId);
+    res.status(200).json(vehicles);
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Failed to get vehicles.';
+    res.status(400).json({ error: message });
+  }
+};
+
 export const registerVehicle = async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user!.user_id;

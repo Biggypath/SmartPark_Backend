@@ -1,5 +1,9 @@
 import * as cardRepo from '../repositories/cardRepository.js';
 
+export const getCards = async (userId: string) => {
+  return cardRepo.findCardsByUserId(userId);
+};
+
 export const addCard = async (userId: string, programId: string) => {
   return cardRepo.createCard({ user_id: userId, program_id: programId });
 };

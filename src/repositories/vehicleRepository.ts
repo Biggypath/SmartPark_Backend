@@ -46,6 +46,13 @@ export const updateVehicle = async (
   });
 };
 
+export const findVehiclesByUserId = async (userId: string) => {
+  return prisma.registeredVehicle.findMany({
+    where: { cards: { some: { user_id: userId } } },
+    include: { cards: true }
+  });
+};
+
 export const deleteVehicle = async (vehicleId: string) => {
   // Disconnect all cards before deleting (clean up M:N)
   await prisma.registeredVehicle.update({

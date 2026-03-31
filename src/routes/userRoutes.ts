@@ -9,11 +9,13 @@ const router = Router();
 router.use(authMiddleware);
 
 // Card management
+router.get('/cards', cardController.getCards);
 router.post('/cards', cardController.addCard);
 router.put('/cards/:card_id', cardController.updateCard);
 router.delete('/cards/:card_id', cardController.deleteCard);
 
 // Vehicle management
+router.get('/vehicles', vehicleController.getVehicles);
 router.post('/vehicles', vehicleController.registerVehicle);
 router.put('/vehicles/:vehicle_id', vehicleController.updateVehicle);
 router.delete('/vehicles/:vehicle_id', vehicleController.deleteVehicle);

@@ -183,3 +183,49 @@ export const handleSlotExit = async (slotId: string, rawData?: string) => {
     };
   });
 };
+
+/**
+ * Check Parking Session by License Plate:
+ * Works for both guest and registered users.
+ * Returns active session details including slot info and privilege data if registered.
+ */
+export const checkSession = async (registration: string, province: string) => {
+  const session = await sessionRepo.findActiveSessionByPlate(registration, province);
+
+  if (!session) {
+    return null;
+  }
+
+  const now = new Date();
+  const durationMs = now.getTime() - session.entry_time.getTime();
+  const durationMinutes = Math.round(durationMs / 60000);
+
+  // Determine free hours from privilege cards if registered
+  let freeHours = 0;
+  if (session.vehicle) {
+    for (const card of session.vehicle.cards) {
+      if (card.program.is_active && card.program.free_hours > freeHours) {
+        freeHours = card.program.free_hours;
+      }
+    }
+  }
+
+  const estimatedFee = calculateFee(session.entry_time, now, freeHours);
+
+  return {
+    session_id: session.session_id,
+    slot: {
+      slot_id: session.slot.slot_id,
+      slot_type: session.slot.slot_type,
+      status: session.slot.status,
+    },
+    registration: session.registration,
+    province: session.province,
+    is_registered: session.vehicle_id !== null,
+    entry_time: session.entry_time,
+    duration_minutes: durationMinutes,
+    estimated_fee: estimatedFee.totalFee,
+    free_hours: freeHours,
+    payment_status: session.payment_status,
+  };
+};
