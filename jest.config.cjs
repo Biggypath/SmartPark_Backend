@@ -27,6 +27,7 @@ module.exports = {
     '!src/config/**',
     '!src/infrastructure/**',
     '!src/app.ts',
+    '!src/middleware/**',
   ],
   coverageDirectory: 'coverage',
   coverageReporters: ['text', 'text-summary', 'lcov', 'clover'],

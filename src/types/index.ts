@@ -1,5 +1,7 @@
 // src/types/index.ts
 
+import type { Request } from 'express';
+
 // 1. LPR Camera Events (from LPR server via RabbitMQ)
 export interface LprEntryEvent {
   registration: string;  // e.g. "1กข 1234"
@@ -21,4 +23,9 @@ export interface ExitFeeResult {
   ratePerHour: number;
   totalFee: number;
   exitTime: Date;
+}
+
+// 4. Authenticated Request (JWT payload attached by authMiddleware)
+export interface AuthRequest extends Request {
+  user?: { user_id: string };
 }
