@@ -6,11 +6,11 @@ const mockPrisma = {
   },
 };
 
-jest.mock('../../../src/config/db', () => ({
+jest.mock('../../../src/config/db.js', () => ({
   prisma: mockPrisma,
 }));
 
-import * as sessionRepo from '../../../src/repositories/sessionRepository';
+import * as sessionRepo from '../../../src/repositories/sessionRepository.js';
 
 describe('sessionRepository', () => {
   beforeEach(() => {

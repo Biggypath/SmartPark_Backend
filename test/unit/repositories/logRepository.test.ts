@@ -5,11 +5,11 @@ const mockPrisma = {
   },
 };
 
-jest.mock('../../../src/config/db', () => ({
+jest.mock('../../../src/config/db.js', () => ({
   prisma: mockPrisma,
 }));
 
-import * as logRepo from '../../../src/repositories/logRepository';
+import * as logRepo from '../../../src/repositories/logRepository.js';
 
 describe('logRepository', () => {
   beforeEach(() => {

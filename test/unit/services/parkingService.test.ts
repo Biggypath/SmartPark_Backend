@@ -2,31 +2,31 @@ const mockPrisma = {
   $transaction: jest.fn(),
 };
 
-jest.mock('../../../src/config/db', () => ({
+jest.mock('../../../src/config/db.js', () => ({
   prisma: mockPrisma,
 }));
 
-jest.mock('../../../src/repositories/slotRepository', () => ({
+jest.mock('../../../src/repositories/slotRepository.js', () => ({
   getAllSlots: jest.fn(),
   findSlotById: jest.fn(),
   updateSlotStatus: jest.fn(),
   findFreeSlotByType: jest.fn(),
 }));
 
-jest.mock('../../../src/repositories/sessionRepository', () => ({
+jest.mock('../../../src/repositories/sessionRepository.js', () => ({
   createSession: jest.fn(),
   findActiveSessionBySlot: jest.fn(),
   updateSessionExit: jest.fn(),
 }));
 
-jest.mock('../../../src/repositories/logRepository', () => ({
+jest.mock('../../../src/repositories/logRepository.js', () => ({
   createLog: jest.fn(),
 }));
 
-import * as parkingService from '../../../src/services/parkingService';
-import * as slotRepo from '../../../src/repositories/slotRepository';
-import * as sessionRepo from '../../../src/repositories/sessionRepository';
-import * as logRepo from '../../../src/repositories/logRepository';
+import * as parkingService from '../../../src/services/parkingService.js';
+import * as slotRepo from '../../../src/repositories/slotRepository.js';
+import * as sessionRepo from '../../../src/repositories/sessionRepository.js';
+import * as logRepo from '../../../src/repositories/logRepository.js';
 
 const mockedGetAllSlots = slotRepo.getAllSlots as jest.MockedFunction<typeof slotRepo.getAllSlots>;
 const mockedFindSlotById = slotRepo.findSlotById as jest.MockedFunction<typeof slotRepo.findSlotById>;

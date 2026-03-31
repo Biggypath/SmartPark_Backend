@@ -7,11 +7,11 @@ const mockPrisma = {
   },
 };
 
-jest.mock('../../../src/config/db', () => ({
+jest.mock('../../../src/config/db.js', () => ({
   prisma: mockPrisma,
 }));
 
-import * as slotRepo from '../../../src/repositories/slotRepository';
+import * as slotRepo from '../../../src/repositories/slotRepository.js';
 
 describe('slotRepository', () => {
   beforeEach(() => {

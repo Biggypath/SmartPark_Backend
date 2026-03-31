@@ -4,11 +4,11 @@ const mockPrisma = {
   },
 };
 
-jest.mock('../../../src/config/db', () => ({
+jest.mock('../../../src/config/db.js', () => ({
   prisma: mockPrisma,
 }));
 
-import { calculateFee, getActiveRate } from '../../../src/services/pricingService';
+import { calculateFee, getActiveRate } from '../../../src/services/pricingService.js';
 
 describe('pricingService', () => {
   beforeEach(() => {
