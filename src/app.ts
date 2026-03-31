@@ -7,6 +7,10 @@ import cors from 'cors';
 import { connectRabbitMQ } from './infrastructure/rabbitmq/connection.js';
 import { startAllConsumers } from './infrastructure/rabbitmq/consumer.js';
 
+// Import routes
+import authRoutes from './routes/authRoutes.js';
+import userRoutes from './routes/userRoutes.js';
+
 const app = express();
 const server = http.createServer(app);
 
@@ -21,6 +25,10 @@ app.use(express.json());
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok' });
 });
+
+// API routes
+app.use('/api/auth', authRoutes);
+app.use('/api/users', userRoutes);
 
 const PORT = process.env.PORT || 3000;
 
