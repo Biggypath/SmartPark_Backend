@@ -11,6 +11,7 @@ import cors from 'cors';
 import authRoutes from './routes/authRoutes.js';
 import userRoutes from './routes/userRoutes.js';
 import parkingRoutes from './routes/parkingRoutes.js';
+import adminRoutes from './routes/adminRoutes.js';
 import { initSocketHandlers } from './infrastructure/socket/socketHandler.js';
 
 const app = express();
@@ -35,6 +36,7 @@ app.get('/health', (_req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/parking', parkingRoutes);
+app.use('/api/admin', adminRoutes);
 
 const PORT = process.env.PORT || 3000;
 

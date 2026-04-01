@@ -44,7 +44,17 @@ async function main() {
     }),
   ]);
 
-  console.log(`Created 2 users`);
+  // Create admin user
+  const admin = await prisma.user.create({
+    data: {
+      email: "admin@smartpark.com",
+      password_hash: passwordHash,
+      name: "Admin",
+      role: "ADMIN",
+    },
+  });
+
+  console.log(`Created 2 users + 1 admin`);
 
   // Create privilege programs
   const [scbFirst, the1Gold, the1Plat] = await Promise.all([

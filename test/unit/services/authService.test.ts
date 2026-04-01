@@ -32,6 +32,7 @@ describe('authService', () => {
         email: 'a@b.com',
         password_hash: 'hashed-password',
         name: 'Test',
+        role: 'USER',
         created_at: new Date(),
       });
 
@@ -53,6 +54,7 @@ describe('authService', () => {
         email: 'a@b.com',
         password_hash: 'h',
         name: 'T',
+        role: 'USER',
         created_at: new Date(),
       });
 
@@ -68,6 +70,7 @@ describe('authService', () => {
         email: 'a@b.com',
         password_hash: 'hashed',
         name: 'Test',
+        role: 'USER',
         created_at: new Date(),
       });
       (mockBcrypt.compare as jest.Mock).mockResolvedValue(true);
@@ -91,6 +94,7 @@ describe('authService', () => {
         email: 'a@b.com',
         password_hash: 'hashed',
         name: 'Test',
+        role: 'USER',
         created_at: new Date(),
       });
       (mockBcrypt.compare as jest.Mock).mockResolvedValue(false);

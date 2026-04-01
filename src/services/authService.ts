@@ -13,7 +13,7 @@ export const register = async (email: string, password: string, name: string) =>
   const password_hash = await bcrypt.hash(password, SALT_ROUNDS);
   const user = await userRepo.createUser({ email, password_hash, name });
 
-  const token = generateToken(user.user_id);
+  const token = generateToken(user.user_id, user.role);
 
   const { password_hash: _, ...userWithoutPassword } = user;
   return { user: userWithoutPassword, token };
@@ -30,7 +30,7 @@ export const login = async (email: string, password: string) => {
     throw new Error('Invalid email or password.');
   }
 
-  const token = generateToken(user.user_id);
+  const token = generateToken(user.user_id, user.role);
 
   const { password_hash: _, ...userWithoutPassword } = user;
   return { user: userWithoutPassword, token };

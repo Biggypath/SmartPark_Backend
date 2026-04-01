@@ -35,6 +35,11 @@ enum PaymentStatus {
   PAID
 }
 
+enum UserRole {
+  USER
+  ADMIN
+}
+
 // ---------------------------------------------------------
 // Identity & Privilege Models
 // ---------------------------------------------------------
@@ -44,6 +49,7 @@ model User {
   email         String   @unique // Used as the login username
   password_hash String // Stores the encrypted password (e.g., via bcrypt)
   name          String
+  role          UserRole @default(USER)
   created_at    DateTime @default(now())
 
   // Relations: A user can hold multiple different cards

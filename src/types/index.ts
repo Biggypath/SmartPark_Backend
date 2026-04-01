@@ -27,5 +27,5 @@ export interface ExitFeeResult {
 
 // 4. Authenticated Request (JWT payload attached by authMiddleware)
 export interface AuthRequest extends Request {
-  user?: { user_id: string };
+  user?: { user_id: string; role: string };
 }
