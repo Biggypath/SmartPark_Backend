@@ -3,6 +3,7 @@ import type { SlotStatus } from '@prisma/client';
 
 export const getAllLots = async () => {
   return prisma.privilegeParking.findMany({
+    include: { mall: true, program: true },
     orderBy: { name: 'asc' }
   });
 };

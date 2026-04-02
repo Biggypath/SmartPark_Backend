@@ -1,4 +1,7 @@
 const mockPrisma = {
+  privilegeParking: {
+    findMany: jest.fn(),
+  },
   parkingSlot: {
     findMany: jest.fn(),
     findUnique: jest.fn(),
@@ -17,11 +20,28 @@ describe('slotRepository', () => {
     jest.clearAllMocks();
   });
 
+  describe('getAllLots', () => {
+    it('should return all lots with mall and program', async () => {
+      const mockLots = [
+        { lot_id: 'l1', name: 'SCB First', mall: { name: 'CentralWorld' }, program: { provider_name: 'SCB First' } },
+      ];
+      mockPrisma.privilegeParking.findMany.mockResolvedValue(mockLots);
+
+      const result = await slotRepo.getAllLots();
+
+      expect(result).toEqual(mockLots);
+      expect(mockPrisma.privilegeParking.findMany).toHaveBeenCalledWith({
+        include: { mall: true, program: true },
+        orderBy: { name: 'asc' },
+      });
+    });
+  });
+
   describe('getAllSlots', () => {
     it('should return all slots ordered by slot_id', async () => {
       const mockSlots = [
-        { slot_id: 'A1', status: 'FREE', lot: { name: 'CentralWorld The 1 Card' } },
-        { slot_id: 'A2', status: 'OCCUPIED', lot: { name: 'CentralWorld The 1 Card' } },
+        { slot_id: 'A1', status: 'FREE', lot: { name: 'The 1 Card' } },
+        { slot_id: 'A2', status: 'OCCUPIED', lot: { name: 'The 1 Card' } },
       ];
       mockPrisma.parkingSlot.findMany.mockResolvedValue(mockSlots);
 

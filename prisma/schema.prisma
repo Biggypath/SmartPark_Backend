@@ -82,8 +82,9 @@ model PrivilegeProgram {
   max_vehicles  Int      @default(1) // Enforces the card's policy on vehicle limits
   is_active     Boolean  @default(true)
 
-  // Relations: The specific cards issued under this program
+  // Relations
   issued_cards  UserCard[]
+  parking_lots  PrivilegeParking[]
 
   @@map("privilege_programs")
 }
@@ -141,12 +142,25 @@ model RegisteredVehicle {
 // Core Parking Models
 // ---------------------------------------------------------
 
-model PrivilegeParking {
-  lot_id   String @id @default(uuid())
-  name     String @unique // e.g., "CentralWorld The 1 Card", "CentralWorld SCB First"
-  location String? // e.g., "123 Siam St, Pathum Wan, Bangkok"
+model Mall {
+  mall_id String @id @default(uuid())
+  name    String @unique // e.g., "CentralWorld", "Siam Paragon"
 
-  slots ParkingSlot[]
+  lots PrivilegeParking[]
+
+  @@map("malls")
+}
+
+model PrivilegeParking {
+  lot_id     String @id @default(uuid())
+  name       String @unique // e.g., "The 1 Card", "SCB First"
+  mall_id    String
+  program_id String
+  location   String? // e.g., "123 Siam St, Pathum Wan, Bangkok"
+
+  mall    Mall             @relation(fields: [mall_id], references: [mall_id])
+  program PrivilegeProgram @relation(fields: [program_id], references: [program_id])
+  slots   ParkingSlot[]
   pricingRule PricingRule?
 
   @@map("parking_lots")

@@ -15,6 +15,7 @@ async function main() {
   await prisma.parkingSlot.deleteMany({});
   await prisma.pricingRule.deleteMany({});
   await prisma.privilegeParking.deleteMany({});
+  await prisma.mall.deleteMany({});
   await prisma.registeredVehicle.deleteMany({});
   await prisma.userCard.deleteMany({});
   await prisma.privilegeProgram.deleteMany({});
@@ -184,18 +185,30 @@ async function main() {
   // Core Parking Data
   // ---------------------------------------------------------
 
+  // Malls
+  const [centralWorld, siamParagon] = await Promise.all([
+    prisma.mall.create({ data: { name: "CentralWorld" } }),
+    prisma.mall.create({ data: { name: "Siam Paragon" } }),
+  ]);
+
+  console.log("Created 2 malls");
+
   // Parking Lots + Pricing Rules (nested create)
   const [lotCW1, lotCWSCB, lotParagonSCB] = await Promise.all([
     prisma.privilegeParking.create({
       data: {
-        name: "CentralWorld The 1 Card",
+        name: "The 1 Card",
+        mall_id: centralWorld!.mall_id,
+        program_id: the1Gold!.program_id,
         location: "CentralWorld, Bangkok",
         pricingRule: { create: { rate_per_hour: 20.0 } },
       },
     }),
     prisma.privilegeParking.create({
       data: {
-        name: "CentralWorld SCB First",
+        name: "SCB First",
+        mall_id: centralWorld!.mall_id,
+        program_id: scbFirst!.program_id,
         location: "CentralWorld, Bangkok",
         pricingRule: { create: { rate_per_hour: 25.0 } },
       },
@@ -203,6 +216,8 @@ async function main() {
     prisma.privilegeParking.create({
       data: {
         name: "Paragon SCB First",
+        mall_id: siamParagon!.mall_id,
+        program_id: scbFirst!.program_id,
         location: "Siam Paragon, Bangkok",
         pricingRule: { create: { rate_per_hour: 30.0 } },
       },
