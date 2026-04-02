@@ -19,11 +19,6 @@ enum SlotStatus {
   ASSIGNED // Slot reserved by the system while the car drives to it
 }
 
-enum SlotType {
-  GENERAL
-  VIP // For privileged cards (SCB First, The 1 Card, etc.)
-}
-
 enum LogEventType {
   ENTRY
   EXIT
@@ -40,6 +35,15 @@ enum UserRole {
   ADMIN
 }
 
+enum CardNetwork {
+  VISA
+  MASTERCARD
+  JCB
+  AMEX
+  UNIONPAY
+  OTHER
+}
+
 // ---------------------------------------------------------
 // Identity & Privilege Models
 // ---------------------------------------------------------
@@ -47,7 +51,7 @@ enum UserRole {
 model User {
   user_id       String   @id @default(uuid())
   email         String   @unique // Used as the login username
-  password_hash String // Stores the encrypted password (e.g., via bcrypt)
+  password_hash String   // Stores the encrypted password (e.g., via bcrypt)
   name          String
   role          UserRole @default(USER)
   created_at    DateTime @default(now())
@@ -59,40 +63,54 @@ model User {
 }
 
 model PrivilegeProgram {
-  program_id    String  @id @default(uuid())
-  provider_name String // e.g., "SCB First", "The 1 Card"
-  tier          String? // e.g., "Private Banking", "Gold"
-  free_hours    Int     @default(0)
-  max_vehicles  Int     @default(1) // Enforces the card's policy on vehicle limits
-  is_active     Boolean @default(true)
+  program_id    String   @id @default(uuid())
+  provider_name String   // e.g., "SCB First", "The 1 Card"
+  tier          String?  // e.g., "Private Banking", "Gold"
+  
+  // An array of BINs (first 6-8 digits) that qualify for this program
+  eligible_bins String[] 
+  
+  free_hours    Int      @default(0)
+  max_vehicles  Int      @default(1) // Enforces the card's policy on vehicle limits
+  is_active     Boolean  @default(true)
 
   // Relations: The specific cards issued under this program
-  issued_cards UserCard[]
+  issued_cards  UserCard[]
 
   @@map("privilege_programs")
 }
 
 model UserCard {
-  card_id    String   @id @default(uuid())
-  user_id    String
-  program_id String
-  issued_at  DateTime @default(now())
-  is_active  Boolean  @default(true)
+  card_id         String      @id @default(uuid())
+  user_id         String
+  program_id      String
+  
+  // Card Identity details (Safe to store)
+  network         CardNetwork 
+  bin             String      // First 6-8 digits (Used to match with PrivilegeProgram)
+  last_four       String      // Last 4 digits (e.g., "1234") - safe to display on frontend
+  expiry_month    Int         // e.g., 12
+  expiry_year     Int         // e.g., 2028
+
+  issued_at       DateTime    @default(now())
+  is_active       Boolean     @default(true)
 
   // Relations
-  user    User             @relation(fields: [user_id], references: [user_id])
-  program PrivilegeProgram @relation(fields: [program_id], references: [program_id])
-
+  user            User              @relation(fields: [user_id], references: [user_id])
+  program         PrivilegeProgram  @relation(fields: [program_id], references: [program_id])
+  
   // Many-to-Many: A single card can cover multiple vehicles (up to max_vehicles)
-  vehicles RegisteredVehicle[]
+  vehicles        RegisteredVehicle[]
 
+  // Ensure a user can't add the exact same card twice
+  @@unique([user_id, bin, last_four])
   @@map("user_cards")
 }
 
 model RegisteredVehicle {
   vehicle_id    String   @id @default(uuid())
-  registration  String // e.g., "1กข 1234"
-  province      String // e.g., "กรุงเทพมหานคร"
+  registration  String   // e.g., "1กข 1234"
+  province      String   // e.g., "กรุงเทพมหานคร"
   registered_at DateTime @default(now())
 
   // Many-to-Many: A single vehicle can be registered under multiple different cards
@@ -110,14 +128,26 @@ model RegisteredVehicle {
 // Core Parking Models
 // ---------------------------------------------------------
 
+model PrivilegeParking {
+  lot_id   String @id @default(uuid())
+  name     String @unique // e.g., "CentralWorld The 1 Card", "CentralWorld SCB First"
+  location String? // e.g., "123 Siam St, Pathum Wan, Bangkok"
+
+  slots ParkingSlot[]
+  pricingRule PricingRule?
+
+  @@map("parking_lots")
+}
+
 model ParkingSlot {
-  slot_id              String     @id // e.g. "VIP-A1" or "GEN-B2"
-  slot_type            SlotType   @default(GENERAL)
+  slot_id              String     @id // e.g. "A1", "B2"
+  lot_id               String
   status               SlotStatus @default(FREE)
-  location_coordinates String // Stores JSON string "{x:10, y:0, z:5}" for Three.js
+  location_coordinates String     // Stores JSON string "{x:10, y:0, z:5}" for Three.js
   is_active            Boolean    @default(true) // Hardware availability
 
   // Relations
+  lot      PrivilegeParking       @relation(fields: [lot_id], references: [lot_id])
   logs     SensorLog[]
   sessions ParkingSession[]
 
@@ -126,9 +156,10 @@ model ParkingSlot {
 
 model PricingRule {
   rule_id        String   @id @default(uuid())
+  parkinglot_id  String   @unique
   rate_per_hour  Float    @default(20.00)
   effective_from DateTime @default(now())
-
+  parkinglot           PrivilegeParking @relation(fields: [parkinglot_id], references: [lot_id])
   @@map("pricing_rules")
 }
 
@@ -137,7 +168,7 @@ model SensorLog {
   slot_id    String
   timestamp  DateTime     @default(now())
   event_type LogEventType
-  raw_data   String? // Raw IR sensor value from the ESP32
+  raw_data   String?      // Raw IR sensor value from the ESP32
 
   // Relations
   slot ParkingSlot @relation(fields: [slot_id], references: [slot_id])
@@ -146,8 +177,8 @@ model SensorLog {
 }
 
 model ParkingSession {
-  session_id String @id @default(uuid())
-  slot_id    String
+  session_id String  @id @default(uuid())
+  slot_id    String? // Null for guest/unregistered vehicles (no slot assigned)
 
   // What the camera actually saw (works for both guests and registered)
   registration String?
@@ -164,7 +195,7 @@ model ParkingSession {
   payment_status   PaymentStatus @default(PENDING)
 
   // Relations
-  slot ParkingSlot @relation(fields: [slot_id], references: [slot_id])
+  slot ParkingSlot? @relation(fields: [slot_id], references: [slot_id])
 
   @@map("parking_sessions")
 }

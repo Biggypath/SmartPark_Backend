@@ -6,7 +6,6 @@ import bcrypt from "bcrypt";
 const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL! });
 const prisma = new PrismaClient({ adapter });
 
-
 async function main() {
   console.log("Starting to seed the database...");
 
@@ -14,7 +13,8 @@ async function main() {
   await prisma.parkingSession.deleteMany({});
   await prisma.sensorLog.deleteMany({});
   await prisma.parkingSlot.deleteMany({});
-  await prisma.pricingRule.deleteMany({});
+  await prisma.pricingRule.deleteMany({}); // Must delete PricingRule before PrivilegeParking
+  await prisma.privilegeParking.deleteMany({}); // Renamed from parkingLot
   await prisma.registeredVehicle.deleteMany({});
   await prisma.userCard.deleteMany({});
   await prisma.privilegeProgram.deleteMany({});
@@ -62,6 +62,7 @@ async function main() {
       data: {
         provider_name: "SCB First",
         tier: "Private Banking",
+        eligible_bins: ["412345", "543210"],
         free_hours: 5,
         max_vehicles: 3,
       },
@@ -70,6 +71,7 @@ async function main() {
       data: {
         provider_name: "The 1 Card",
         tier: "Gold",
+        eligible_bins: ["456789"], 
         free_hours: 2,
         max_vehicles: 2,
       },
@@ -78,6 +80,7 @@ async function main() {
       data: {
         provider_name: "The 1 Card",
         tier: "Platinum",
+        eligible_bins: ["371234"], 
         free_hours: 3,
         max_vehicles: 3,
       },
@@ -89,19 +92,43 @@ async function main() {
   // Create user cards
   const [card1, card2, card3] = await Promise.all([
     prisma.userCard.create({
-      data: { user_id: user1!.user_id, program_id: scbFirst!.program_id },
+      data: { 
+        user_id: user1!.user_id, 
+        program_id: scbFirst!.program_id,
+        network: "VISA",
+        bin: "412345",
+        last_four: "1234",
+        expiry_month: 12,
+        expiry_year: 2028
+      },
     }),
     prisma.userCard.create({
-      data: { user_id: user1!.user_id, program_id: the1Gold!.program_id },
+      data: { 
+        user_id: user1!.user_id, 
+        program_id: the1Gold!.program_id,
+        network: "MASTERCARD",
+        bin: "456789",
+        last_four: "5678",
+        expiry_month: 10,
+        expiry_year: 2026
+      },
     }),
     prisma.userCard.create({
-      data: { user_id: user2!.user_id, program_id: the1Plat!.program_id },
+      data: { 
+        user_id: user2!.user_id, 
+        program_id: the1Plat!.program_id,
+        network: "AMEX",
+        bin: "371234",
+        last_four: "9012",
+        expiry_month: 5,
+        expiry_year: 2029
+      },
     }),
   ]);
 
   console.log(`Created 3 user cards`);
 
-  // Create registered vehicles (linked to cards via M:N)
+  // Create registered vehicles
   const [vehicle1, vehicle2, vehicle3] = await Promise.all([
     prisma.registeredVehicle.create({
       data: {
@@ -130,30 +157,48 @@ async function main() {
 
   // --- Core Parking Data ---
 
-  // Create pricing rules
-  const pricingRules = await Promise.all([
-    prisma.pricingRule.create({ data: { rate_per_hour: 20.0 } }),
-    prisma.pricingRule.create({ data: { rate_per_hour: 15.0 } }),
+  // Create Privilege Parking Lots AND their linked Pricing Rules using nested writes
+  const [lotCW1, lotCWSCB, lotParagonSCB] = await Promise.all([
+    prisma.privilegeParking.create({
+      data: { 
+        name: "CentralWorld The 1 Card", 
+        location: "CentralWorld, Bangkok",
+        pricingRule: { create: { rate_per_hour: 20.0 } }
+      },
+    }),
+    prisma.privilegeParking.create({
+      data: { 
+        name: "CentralWorld SCB First", 
+        location: "CentralWorld, Bangkok",
+        pricingRule: { create: { rate_per_hour: 25.0 } }
+      },
+    }),
+    prisma.privilegeParking.create({
+      data: { 
+        name: "Paragon SCB First", 
+        location: "Siam Paragon, Bangkok",
+        pricingRule: { create: { rate_per_hour: 30.0 } }
+      },
+    }),
   ]);
 
-  console.log(`Created ${pricingRules.length} pricing rules`);
+  console.log(`Created 3 privilege parking lots with their associated pricing rules`);
 
-  // Create parking slots (VIP row + 3 GENERAL rows, 5 cols each = 20 slots)
+  // Create parking slots (5 slots per lot = 15 slots total)
+  const lots = [lotCW1!, lotCWSCB!, lotParagonSCB!];
   const slots = [];
-  for (let row = 0; row < 4; row++) {
+  for (let lotIdx = 0; lotIdx < lots.length; lotIdx++) {
+    const lot = lots[lotIdx]!;
     for (let col = 0; col < 5; col++) {
-      const isVip = row === 0;
-      const prefix = isVip ? "VIP" : "GEN";
-      const label = String.fromCharCode(65 + row) + (col + 1);
-      const slotId = `${prefix}-${label}`;
+      const label = String.fromCharCode(65 + lotIdx) + (col + 1);
 
       slots.push(
         prisma.parkingSlot.create({
           data: {
-            slot_id: slotId,
-            slot_type: isVip ? "VIP" : "GENERAL",
+            slot_id: label,
+            lot_id: lot.lot_id, // Links to the PrivilegeParking lot_id
             status: "FREE",
-            location_coordinates: JSON.stringify({ x: col * 10, y: row * 10, z: 0 }),
+            location_coordinates: JSON.stringify({ x: col * 10, y: lotIdx * 10, z: 0 }),
             is_active: true,
           },
         })
@@ -181,11 +226,10 @@ async function main() {
   const logs = await Promise.all(sensorLogs);
   console.log(`Created ${logs.length} sensor logs`);
 
-  // Create parking sessions (mix of registered vehicles and guests)
+  // Create parking sessions
   const now = new Date();
 
   const sessions = await Promise.all([
-    // Completed session — registered vehicle
     prisma.parkingSession.create({
       data: {
         slot_id: parkingSlots[0]!.slot_id,
@@ -195,25 +239,22 @@ async function main() {
         entry_time: new Date(now.getTime() - 4 * 3600000),
         exit_time: new Date(now.getTime() - 1 * 3600000),
         duration_minutes: 180,
-        total_fee: 0, // Covered by SCB First (5 free hours)
+        total_fee: 0, 
         payment_status: "PAID",
       },
     }),
-    // Completed session — guest
     prisma.parkingSession.create({
       data: {
-        slot_id: parkingSlots[5]!.slot_id,
         registration: "9ดจ 4444",
         province: "ชลบุรี",
         vehicle_id: null,
         entry_time: new Date(now.getTime() - 3 * 3600000),
         exit_time: new Date(now.getTime() - 0.5 * 3600000),
         duration_minutes: 150,
-        total_fee: 60, // 3 billable hours × 20
+        total_fee: 60, 
         payment_status: "PAID",
       },
     }),
-    // Active session — registered vehicle (still parked)
     prisma.parkingSession.create({
       data: {
         slot_id: parkingSlots[1]!.slot_id,
@@ -224,10 +265,8 @@ async function main() {
         payment_status: "PENDING",
       },
     }),
-    // Active session — guest (still parked)
     prisma.parkingSession.create({
       data: {
-        slot_id: parkingSlots[6]!.slot_id,
         registration: "7ฉช 8888",
         province: "นนทบุรี",
         vehicle_id: null,
@@ -240,7 +279,6 @@ async function main() {
   // Mark active session slots as OCCUPIED
   await Promise.all([
     prisma.parkingSlot.update({ where: { slot_id: parkingSlots[1]!.slot_id }, data: { status: "OCCUPIED" } }),
-    prisma.parkingSlot.update({ where: { slot_id: parkingSlots[6]!.slot_id }, data: { status: "OCCUPIED" } }),
   ]);
 
   console.log(`Created ${sessions.length} parking sessions`);
