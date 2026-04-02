@@ -9,6 +9,9 @@ export const registerVehicle = async (
   userId: string,
   registration: string,
   province: string,
+  brand: string,
+  model: string,
+  color: string,
   cardId: string
 ) => {
   // Verify the card belongs to the authenticated user
@@ -20,13 +23,13 @@ export const registerVehicle = async (
     throw new Error('You do not own this card.');
   }
 
-  return vehicleRepo.createVehicle({ registration, province, cardIds: [cardId] });
+  return vehicleRepo.createVehicle({ registration, province, brand, model, color, cardIds: [cardId] });
 };
 
 export const updateVehicle = async (
   userId: string,
   vehicleId: string,
-  data: { registration?: string; province?: string; card_id?: string }
+  data: { registration?: string; province?: string; brand?: string; model?: string; color?: string; card_id?: string }
 ) => {
   const vehicle = await vehicleRepo.findVehicleById(vehicleId);
   if (!vehicle) {
@@ -42,9 +45,12 @@ export const updateVehicle = async (
   }
 
   // If changing the linked card, verify ownership of the new card
-  const updateData: { registration?: string; province?: string; cardIds?: string[] } = {};
+  const updateData: { registration?: string; province?: string; brand?: string; model?: string; color?: string; cardIds?: string[] } = {};
   if (data.registration !== undefined) updateData.registration = data.registration;
   if (data.province !== undefined) updateData.province = data.province;
+  if (data.brand !== undefined) updateData.brand = data.brand;
+  if (data.model !== undefined) updateData.model = data.model;
+  if (data.color !== undefined) updateData.color = data.color;
   if (data.card_id !== undefined) {
     const newCard = await cardRepo.findCardById(data.card_id);
     if (!newCard || newCard.user_id !== userId) {

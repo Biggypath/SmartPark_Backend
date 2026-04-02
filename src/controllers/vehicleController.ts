@@ -16,12 +16,12 @@ export const getVehicles = async (req: AuthRequest, res: Response) => {
 export const registerVehicle = async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user!.user_id;
-    const { registration, province, card_id } = req.body;
-    if (!registration || !province || !card_id) {
-      res.status(400).json({ error: 'registration, province, and card_id are required.' });
+    const { registration, province, brand, model, color, card_id } = req.body;
+    if (!registration || !province || !brand || !model || !color || !card_id) {
+      res.status(400).json({ error: 'registration, province, brand, model, color, and card_id are required.' });
       return;
     }
-    const vehicle = await vehicleService.registerVehicle(userId, registration, province, card_id);
+    const vehicle = await vehicleService.registerVehicle(userId, registration, province, brand, model, color, card_id);
     res.status(201).json(vehicle);
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Failed to register vehicle.';

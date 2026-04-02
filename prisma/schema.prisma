@@ -70,7 +70,6 @@ model PrivilegeProgram {
   // An array of BINs (first 6-8 digits) that qualify for this program
   eligible_bins String[] 
   
-  free_hours    Int      @default(0)
   max_vehicles  Int      @default(1) // Enforces the card's policy on vehicle limits
   is_active     Boolean  @default(true)
 
@@ -111,6 +110,9 @@ model RegisteredVehicle {
   vehicle_id    String   @id @default(uuid())
   registration  String   // e.g., "1กข 1234"
   province      String   // e.g., "กรุงเทพมหานคร"
+  brand        String?  // e.g., "Toyota"
+  model        String?  // e.g., "Camry"
+  color        String?  // e.g., "Black"
   registered_at DateTime @default(now())
 
   // Many-to-Many: A single vehicle can be registered under multiple different cards

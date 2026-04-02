@@ -52,7 +52,7 @@ describe('vehicleController', () => {
     it('should return 201 with created vehicle', async () => {
       const req = {
         user: { user_id: 'u1' },
-        body: { registration: 'ABC', province: 'BKK', card_id: 'c1' },
+        body: { registration: 'ABC', province: 'BKK', brand: 'Toyota', model: 'Camry', color: 'White', card_id: 'c1' },
       } as AuthRequest;
       const res = mockRes();
       const vehicle = { vehicle_id: 'v1' };
@@ -79,7 +79,7 @@ describe('vehicleController', () => {
     it('should return 404 if card not found', async () => {
       const req = {
         user: { user_id: 'u1' },
-        body: { registration: 'ABC', province: 'BKK', card_id: 'c1' },
+        body: { registration: 'ABC', province: 'BKK', brand: 'Toyota', model: 'Camry', color: 'White', card_id: 'c1' },
       } as AuthRequest;
       const res = mockRes();
       mockVehicleService.registerVehicle.mockRejectedValue(new Error('Card not found.'));
@@ -92,7 +92,7 @@ describe('vehicleController', () => {
     it('should return 403 if card not owned', async () => {
       const req = {
         user: { user_id: 'u1' },
-        body: { registration: 'ABC', province: 'BKK', card_id: 'c1' },
+        body: { registration: 'ABC', province: 'BKK', brand: 'Toyota', model: 'Camry', color: 'White', card_id: 'c1' },
       } as AuthRequest;
       const res = mockRes();
       mockVehicleService.registerVehicle.mockRejectedValue(new Error('You do not own this card.'));

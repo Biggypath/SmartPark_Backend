@@ -3,12 +3,18 @@ import { prisma } from '../config/db.js';
 export const createVehicle = async (data: {
   registration: string;
   province: string;
+  brand: string;
+  model: string;
+  color: string;
   cardIds: string[];
 }) => {
   return prisma.registeredVehicle.create({
     data: {
       registration: data.registration,
       province: data.province,
+      brand: data.brand,
+      model: data.model,
+      color: data.color,
       cards: { connect: data.cardIds.map((id) => ({ card_id: id })) }
     },
     include: { cards: true }
@@ -27,12 +33,18 @@ export const updateVehicle = async (
   data: {
     registration?: string;
     province?: string;
+    brand?: string;
+    model?: string;
+    color?: string;
     cardIds?: string[];
   }
 ) => {
   const updateData: Record<string, unknown> = {};
   if (data.registration !== undefined) updateData.registration = data.registration;
   if (data.province !== undefined) updateData.province = data.province;
+  if (data.brand !== undefined) updateData.brand = data.brand;
+  if (data.model !== undefined) updateData.model = data.model;
+  if (data.color !== undefined) updateData.color = data.color;
   if (data.cardIds !== undefined) {
     updateData.cards = {
       set: data.cardIds.map((id) => ({ card_id: id }))

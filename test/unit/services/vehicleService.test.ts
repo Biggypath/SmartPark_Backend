@@ -41,12 +41,15 @@ describe('vehicleService', () => {
       const mockVehicle = { vehicle_id: 'v1', registration: 'ABC', province: 'BKK', cards: [] } as any;
       mockVehicleRepo.createVehicle.mockResolvedValue(mockVehicle);
 
-      const result = await vehicleService.registerVehicle('u1', 'ABC', 'BKK', 'c1');
+      const result = await vehicleService.registerVehicle('u1', 'ABC', 'BKK', 'Toyota', 'Camry', 'White', 'c1');
 
       expect(result).toEqual(mockVehicle);
       expect(mockVehicleRepo.createVehicle).toHaveBeenCalledWith({
         registration: 'ABC',
         province: 'BKK',
+        brand: 'Toyota',
+        model: 'Camry',
+        color: 'White',
         cardIds: ['c1'],
       });
     });
@@ -54,14 +57,14 @@ describe('vehicleService', () => {
     it('should throw if card not found', async () => {
       mockCardRepo.findCardById.mockResolvedValue(null);
 
-      await expect(vehicleService.registerVehicle('u1', 'ABC', 'BKK', 'c1'))
+      await expect(vehicleService.registerVehicle('u1', 'ABC', 'BKK', 'Toyota', 'Camry', 'White', 'c1'))
         .rejects.toThrow('Card not found.');
     });
 
     it('should throw if card belongs to another user', async () => {
       mockCardRepo.findCardById.mockResolvedValue({ card_id: 'c1', user_id: 'other' } as any);
 
-      await expect(vehicleService.registerVehicle('u1', 'ABC', 'BKK', 'c1'))
+      await expect(vehicleService.registerVehicle('u1', 'ABC', 'BKK', 'Toyota', 'Camry', 'White', 'c1'))
         .rejects.toThrow('You do not own this card.');
     });
   });
