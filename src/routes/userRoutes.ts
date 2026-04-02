@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { authMiddleware } from '../middleware/authMiddleware.js';
 import * as cardController from '../controllers/cardController.js';
 import * as vehicleController from '../controllers/vehicleController.js';
+import * as parkingController from '../controllers/parkingController.js';
 
 const router = Router();
 
@@ -19,5 +20,8 @@ router.get('/vehicles', vehicleController.getVehicles);
 router.post('/vehicles', vehicleController.registerVehicle);
 router.put('/vehicles/:vehicle_id', vehicleController.updateVehicle);
 router.delete('/vehicles/:vehicle_id', vehicleController.deleteVehicle);
+
+// Parking history
+router.get('/parking/history', parkingController.getParkingHistory);
 
 export default router;

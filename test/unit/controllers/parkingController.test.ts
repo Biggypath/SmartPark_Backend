@@ -1,5 +1,8 @@
 jest.mock('../../../src/services/parkingService.js', () => ({
   getDashboardData: jest.fn(),
+  getLots: jest.fn(),
+  getDashboardByLot: jest.fn(),
+  getParkingHistory: jest.fn(),
   handleLprEntry: jest.fn(),
   handleSlotOccupation: jest.fn(),
   handleSlotExit: jest.fn(),
@@ -26,8 +29,8 @@ describe('parkingController', () => {
   describe('getDashboard', () => {
     it('should return 200 with all slots', async () => {
       const mockSlots = [
-        { slot_id: 'VIP-A1', status: 'OCCUPIED', slot_type: 'VIP', location_coordinates: '{}', is_active: true },
-        { slot_id: 'GEN-A1', status: 'FREE', slot_type: 'GENERAL', location_coordinates: '{}', is_active: true },
+        { slot_id: 'A1', status: 'OCCUPIED', location_coordinates: '{}', is_active: true },
+        { slot_id: 'B1', status: 'FREE', location_coordinates: '{}', is_active: true },
       ];
       const req = {} as any;
       const res = mockRes();
@@ -59,6 +62,55 @@ describe('parkingController', () => {
 
       expect(res.status).toHaveBeenCalledWith(500);
       expect(res.json).toHaveBeenCalledWith({ error: 'DB connection failed' });
+    });
+  });
+
+  describe('getLots', () => {
+    it('should return 200 with lots list', async () => {
+      const lots = [{ lot_id: 'lot-1', name: 'CentralWorld SCB' }];
+      const req = {} as any;
+      const res = mockRes();
+      mockParkingService.getLots.mockResolvedValue(lots as any);
+
+      await parkingController.getLots(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(200);
+      expect(res.json).toHaveBeenCalledWith(lots);
+    });
+
+    it('should return 500 on error', async () => {
+      const req = {} as any;
+      const res = mockRes();
+      mockParkingService.getLots.mockRejectedValue(new Error('DB down'));
+
+      await parkingController.getLots(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(500);
+    });
+  });
+
+  describe('getLotDashboard', () => {
+    it('should return 200 with slots for the lot', async () => {
+      const slots = [{ slot_id: 'A1', status: 'FREE', lot_id: 'lot-1' }];
+      const req = { params: { lotId: 'lot-1' } } as any;
+      const res = mockRes();
+      mockParkingService.getDashboardByLot.mockResolvedValue(slots as any);
+
+      await parkingController.getLotDashboard(req, res);
+
+      expect(mockParkingService.getDashboardByLot).toHaveBeenCalledWith('lot-1');
+      expect(res.status).toHaveBeenCalledWith(200);
+      expect(res.json).toHaveBeenCalledWith(slots);
+    });
+
+    it('should return 500 on error', async () => {
+      const req = { params: { lotId: 'lot-1' } } as any;
+      const res = mockRes();
+      mockParkingService.getDashboardByLot.mockRejectedValue(new Error('DB down'));
+
+      await parkingController.getLotDashboard(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(500);
     });
   });
 
@@ -100,7 +152,7 @@ describe('parkingController', () => {
     it('should return 200 with session data', async () => {
       const sessionData = {
         session_id: 'sess-1',
-        slot: { slot_id: 'VIP-A1', slot_type: 'VIP', status: 'OCCUPIED' },
+        slot: { slot_id: 'A1', status: 'OCCUPIED' },
         registration: '1กข 1234',
         province: 'กรุงเทพมหานคร',
         is_registered: true,
@@ -130,6 +182,33 @@ describe('parkingController', () => {
 
       expect(res.status).toHaveBeenCalledWith(500);
       expect(res.json).toHaveBeenCalledWith({ error: 'DB down' });
+    });
+  });
+
+  describe('getParkingHistory', () => {
+    it('should return 200 with history', async () => {
+      const history = [
+        { session_id: 's1', location: 'CentralWorld SCB', slot_id: 'A1', entry_time: '2026-04-01T10:00:00Z', exit_time: '2026-04-01T12:00:00Z', total_fee: 40 },
+      ];
+      const req = { user: { user_id: 'u1' } } as any;
+      const res = mockRes();
+      mockParkingService.getParkingHistory.mockResolvedValue(history as any);
+
+      await parkingController.getParkingHistory(req, res);
+
+      expect(mockParkingService.getParkingHistory).toHaveBeenCalledWith('u1');
+      expect(res.status).toHaveBeenCalledWith(200);
+      expect(res.json).toHaveBeenCalledWith(history);
+    });
+
+    it('should return 500 on error', async () => {
+      const req = { user: { user_id: 'u1' } } as any;
+      const res = mockRes();
+      mockParkingService.getParkingHistory.mockRejectedValue(new Error('DB down'));
+
+      await parkingController.getParkingHistory(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(500);
     });
   });
 });

@@ -6,6 +6,7 @@ import type { Request } from 'express';
 export interface LprEntryEvent {
   registration: string;  // e.g. "1กข 1234"
   province: string;      // e.g. "กรุงเทพมหานคร"
+  lotId: string;         // Which parking lot this camera belongs to
 }
 
 // 2. ESP32 Sensor Events (from IoT hardware via RabbitMQ)

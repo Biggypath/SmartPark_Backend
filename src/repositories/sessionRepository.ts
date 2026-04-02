@@ -3,14 +3,14 @@ import { prisma } from '../config/db.js';
 
 // 1. Start a Session (Car Enters)
 export const createSession = async (data: {
-  slotId: string;
+  slotId?: string;
   registration?: string;
   province?: string;
   vehicleId?: string;
 }) => {
   return prisma.parkingSession.create({
     data: {
-      slot_id: data.slotId,
+      slot_id: data.slotId ?? null,
       registration: data.registration ?? null,
       province: data.province ?? null,
       vehicle_id: data.vehicleId ?? null,
@@ -67,5 +67,28 @@ export const updateSessionExit = async (
       duration_minutes: durationMinutes,
       payment_status: 'PAID'
     }
+  });
+};
+
+// 4. Get parking history for a user's registered vehicles
+export const findSessionsByUserId = async (userId: string) => {
+  return prisma.parkingSession.findMany({
+    where: {
+      vehicle: {
+        cards: {
+          some: {
+            user_id: userId
+          }
+        }
+      }
+    },
+    include: {
+      slot: {
+        include: {
+          lot: { select: { name: true, location: true } }
+        }
+      }
+    },
+    orderBy: { entry_time: 'desc' }
   });
 };

@@ -50,19 +50,32 @@ describe('cardController', () => {
 
   describe('addCard', () => {
     it('should return 201 with created card', async () => {
-      const req = { user: { user_id: 'u1' }, body: { program_id: 'p1' } } as AuthRequest;
+      const req = {
+        user: { user_id: 'u1' },
+        body: { card_number: '4111111111111111', expiry_month: 12, expiry_year: 2028 },
+      } as AuthRequest;
       const res = mockRes();
       const card = { card_id: 'c1', user_id: 'u1', program_id: 'p1' };
       mockCardService.addCard.mockResolvedValue(card as any);
 
       await cardController.addCard(req, res);
 
+      expect(mockCardService.addCard).toHaveBeenCalledWith('u1', '4111111111111111', 12, 2028);
       expect(res.status).toHaveBeenCalledWith(201);
       expect(res.json).toHaveBeenCalledWith(card);
     });
 
-    it('should return 400 if program_id missing', async () => {
-      const req = { user: { user_id: 'u1' }, body: {} } as AuthRequest;
+    it('should return 400 if card_number missing', async () => {
+      const req = { user: { user_id: 'u1' }, body: { expiry_month: 12, expiry_year: 2028 } } as AuthRequest;
+      const res = mockRes();
+
+      await cardController.addCard(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(400);
+    });
+
+    it('should return 400 if expiry_month missing', async () => {
+      const req = { user: { user_id: 'u1' }, body: { card_number: '4111111111111111', expiry_year: 2028 } } as AuthRequest;
       const res = mockRes();
 
       await cardController.addCard(req, res);
@@ -71,7 +84,10 @@ describe('cardController', () => {
     });
 
     it('should return 400 on service error', async () => {
-      const req = { user: { user_id: 'u1' }, body: { program_id: 'p1' } } as AuthRequest;
+      const req = {
+        user: { user_id: 'u1' },
+        body: { card_number: '4111111111111111', expiry_month: 12, expiry_year: 2028 },
+      } as AuthRequest;
       const res = mockRes();
       mockCardService.addCard.mockRejectedValue(new Error('Failed'));
 

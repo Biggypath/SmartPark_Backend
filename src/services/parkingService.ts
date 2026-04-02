@@ -5,6 +5,40 @@ import * as logRepo from '../repositories/logRepository.js';
 import { calculateFee } from './pricingService.js';
 
 /**
+ * Returns all parking lots.
+ */
+export const getLots = async () => {
+  return await slotRepo.getAllLots();
+};
+
+/**
+ * Returns parking history for a user's registered vehicles.
+ */
+export const getParkingHistory = async (userId: string) => {
+  const sessions = await sessionRepo.findSessionsByUserId(userId);
+  return sessions.map((s) => ({
+    session_id: s.session_id,
+    location: s.slot?.lot?.name ?? null,
+    address: s.slot?.lot?.location ?? null,
+    slot_id: s.slot_id,
+    registration: s.registration,
+    province: s.province,
+    entry_time: s.entry_time,
+    exit_time: s.exit_time,
+    duration_minutes: s.duration_minutes,
+    total_fee: s.total_fee,
+    payment_status: s.payment_status,
+  }));
+};
+
+/**
+ * Returns all slots for a specific parking lot.
+ */
+export const getDashboardByLot = async (lotId: string) => {
+  return await slotRepo.getSlotsByLotId(lotId);
+};
+
+/**
  * Returns all slots for the 3D Digital Twin dashboard.
  */
 export const getDashboardData = async () => {
@@ -14,11 +48,10 @@ export const getDashboardData = async () => {
 /**
  * Handle LPR Entry Event:
  * 1. Look up vehicle in RegisteredVehicle by composite key.
- * 2. If registered with active cards → prefer VIP slot, fallback to GENERAL.
- * 3. If guest → assign a GENERAL slot.
- * 4. Create ParkingSession and mark slot as ASSIGNED.
+ * 2. If registered with active cards → assign a free slot and mark ASSIGNED.
+ * 3. If guest/unregistered → create session only (no slot assigned).
  */
-export const handleLprEntry = async (registration: string, province: string) => {
+export const handleLprEntry = async (registration: string, province: string, lotId: string) => {
   return await prisma.$transaction(async (tx) => {
     // Look up registered vehicle with active cards
     const vehicle = await tx.registeredVehicle.findUnique({
@@ -32,42 +65,30 @@ export const handleLprEntry = async (registration: string, province: string) => 
     });
 
     const isRegistered = vehicle && vehicle.cards.length > 0;
-    let slot;
+    let slot = null;
 
     if (isRegistered) {
-      // Prefer VIP, fallback to GENERAL
+      // Registered with active card → assign a free slot within the specified lot
       slot = await tx.parkingSlot.findFirst({
-        where: { status: 'FREE', slot_type: 'VIP', is_active: true },
+        where: { lot_id: lotId, status: 'FREE', is_active: true },
         orderBy: { slot_id: 'asc' }
       });
+
       if (!slot) {
-        slot = await tx.parkingSlot.findFirst({
-          where: { status: 'FREE', slot_type: 'GENERAL', is_active: true },
-          orderBy: { slot_id: 'asc' }
-        });
+        throw new Error('No available parking slots.');
       }
-    } else {
-      // Guest: GENERAL only
-      slot = await tx.parkingSlot.findFirst({
-        where: { status: 'FREE', slot_type: 'GENERAL', is_active: true },
-        orderBy: { slot_id: 'asc' }
+
+      // Mark slot as ASSIGNED
+      await tx.parkingSlot.update({
+        where: { slot_id: slot.slot_id },
+        data: { status: 'ASSIGNED' }
       });
     }
 
-    if (!slot) {
-      throw new Error('No available parking slots.');
-    }
-
-    // Mark slot as ASSIGNED
-    await tx.parkingSlot.update({
-      where: { slot_id: slot.slot_id },
-      data: { status: 'ASSIGNED' }
-    });
-
-    // Create parking session
+    // Create parking session (slot_id is null for guests)
     const session = await tx.parkingSession.create({
       data: {
-        slot_id: slot.slot_id,
+        slot_id: slot?.slot_id ?? null,
         registration,
         province,
         vehicle_id: vehicle?.vehicle_id ?? null,
@@ -115,11 +136,16 @@ export const handleSlotExit = async (slotId: string, rawData?: string) => {
   return await prisma.$transaction(async (tx) => {
     // Find active session by slot
     const session = await tx.parkingSession.findFirst({
-      where: { slot_id: slotId, exit_time: null }
+      where: { slot_id: slotId, exit_time: null },
+      include: { slot: { select: { lot_id: true } } }
     });
 
     if (!session) {
       throw new Error(`No active parking session found for slot ${slotId}.`);
+    }
+
+    if (!session.slot_id) {
+      throw new Error(`Session ${session.session_id} has no assigned slot.`);
     }
 
     const now = new Date();
@@ -179,6 +205,7 @@ export const handleSlotExit = async (slotId: string, rawData?: string) => {
     return {
       sessionId: session.session_id,
       slotId: session.slot_id,
+      lotId: session.slot!.lot_id,
       ...feeResult
     };
   });
@@ -214,11 +241,10 @@ export const checkSession = async (registration: string, province: string) => {
 
   return {
     session_id: session.session_id,
-    slot: {
+    slot: session.slot ? {
       slot_id: session.slot.slot_id,
-      slot_type: session.slot.slot_type,
       status: session.slot.status,
-    },
+    } : null,
     registration: session.registration,
     province: session.province,
     is_registered: session.vehicle_id !== null,

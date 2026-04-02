@@ -112,7 +112,7 @@ describe('sessionRepository', () => {
         registration: '1กข 1234',
         province: 'กรุงเทพมหานคร',
         exit_time: null,
-        slot: { slot_id: 'VIP-A1', slot_type: 'VIP', status: 'OCCUPIED' },
+        slot: { slot_id: 'A1', status: 'OCCUPIED' },
         vehicle: {
           cards: [{ is_active: true, program: { free_hours: 5 } }],
         },

@@ -1,8 +1,32 @@
 import { prisma } from '../config/db.js';
-import type { SlotStatus, SlotType } from '@prisma/client';
+import type { SlotStatus } from '@prisma/client';
+
+export const getAllLots = async () => {
+  return prisma.privilegeParking.findMany({
+    orderBy: { name: 'asc' }
+  });
+};
 
 export const getAllSlots = async () => {
   return prisma.parkingSlot.findMany({
+    include: { lot: true },
+    orderBy: { slot_id: 'asc' }
+  });
+};
+
+export const getSlotsByLotId = async (lotId: string) => {
+  return prisma.parkingSlot.findMany({
+    where: { lot_id: lotId },
+    include: {
+      sessions: {
+        where: { exit_time: null },
+        select: {
+          session_id: true,
+          registration: true,
+          province: true,
+        }
+      }
+    },
     orderBy: { slot_id: 'asc' }
   });
 };
@@ -15,16 +39,5 @@ export const updateSlotStatus = async (slotId: string, status: SlotStatus) => {
   return prisma.parkingSlot.update({
     where: { slot_id: slotId },
     data: { status }
-  });
-};
-
-export const findFreeSlotByType = async (slotType: SlotType) => {
-  return prisma.parkingSlot.findFirst({
-    where: {
-      status: 'FREE',
-      slot_type: slotType,
-      is_active: true
-    },
-    orderBy: { slot_id: 'asc' }
   });
 };

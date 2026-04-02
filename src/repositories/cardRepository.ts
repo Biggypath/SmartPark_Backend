@@ -1,9 +1,27 @@
 import { prisma } from '../config/db.js';
+import type { CardNetwork } from '@prisma/client';
 
-export const createCard = async (data: { user_id: string; program_id: string }) => {
+export const createCard = async (data: {
+  user_id: string;
+  program_id: string;
+  network: CardNetwork;
+  bin: string;
+  last_four: string;
+  expiry_month: number;
+  expiry_year: number;
+}) => {
   return prisma.userCard.create({
     data,
     include: { program: true }
+  });
+};
+
+export const findProgramByBin = async (bin: string) => {
+  return prisma.privilegeProgram.findFirst({
+    where: {
+      is_active: true,
+      eligible_bins: { has: bin }
+    }
   });
 };
 

@@ -1,5 +1,5 @@
 jest.mock('../../../src/services/parkingService.js', () => ({
-  getDashboardData: jest.fn(),
+  getDashboardByLot: jest.fn(),
 }));
 
 import { initSocketHandlers, emitSlotUpdate, emitSessionClosed } from '../../../src/infrastructure/socket/socketHandler.js';
@@ -10,22 +10,33 @@ const mockParkingService = parkingService as jest.Mocked<typeof parkingService>;
 describe('socketHandler', () => {
   let mockIo: any;
   let mockSocket: any;
+  let mockRoomEmit: any;
   let connectionCallback: (socket: any) => void;
+  let socketEventHandlers: Record<string, Function | undefined>;
 
   beforeEach(() => {
     jest.clearAllMocks();
 
+    socketEventHandlers = {};
+
     mockSocket = {
       id: 'test-socket-id',
       emit: jest.fn(),
-      on: jest.fn(),
+      on: jest.fn((event: string, cb: any) => {
+        socketEventHandlers[event] = cb;
+      }),
+      join: jest.fn(),
+      leave: jest.fn(),
+      rooms: new Set(['test-socket-id']),
     };
+
+    mockRoomEmit = jest.fn();
 
     mockIo = {
       on: jest.fn((event: string, cb: any) => {
         if (event === 'connection') connectionCallback = cb;
       }),
-      emit: jest.fn(),
+      to: jest.fn().mockReturnValue({ emit: mockRoomEmit }),
     };
   });
 
@@ -36,84 +47,107 @@ describe('socketHandler', () => {
       expect(mockIo.on).toHaveBeenCalledWith('connection', expect.any(Function));
     });
 
-    it('should send dashboard data to the client on connect', async () => {
-      const mockSlots = [
-        { slot_id: 'VIP-A1', status: 'OCCUPIED', slot_type: 'VIP' },
-        { slot_id: 'GEN-A1', status: 'FREE', slot_type: 'GENERAL' },
-      ];
-      mockParkingService.getDashboardData.mockResolvedValue(mockSlots as any);
-
+    it('should register join:lot, leave:lot, and disconnect handlers on connect', async () => {
       initSocketHandlers(mockIo);
       await connectionCallback(mockSocket);
 
-      expect(mockParkingService.getDashboardData).toHaveBeenCalled();
-      expect(mockSocket.emit).toHaveBeenCalledWith('dashboard:init', mockSlots);
-    });
-
-    it('should register a disconnect handler', async () => {
-      mockParkingService.getDashboardData.mockResolvedValue([]);
-
-      initSocketHandlers(mockIo);
-      await connectionCallback(mockSocket);
-
+      expect(mockSocket.on).toHaveBeenCalledWith('join:lot', expect.any(Function));
+      expect(mockSocket.on).toHaveBeenCalledWith('leave:lot', expect.any(Function));
       expect(mockSocket.on).toHaveBeenCalledWith('disconnect', expect.any(Function));
     });
 
-    it('should not crash if getDashboardData fails', async () => {
-      mockParkingService.getDashboardData.mockRejectedValue(new Error('DB down'));
+    it('should join lot room and send dashboard data on join:lot', async () => {
+      const mockSlots = [
+        { slot_id: 'A1', status: 'OCCUPIED', lot_id: 'lot-1' },
+        { slot_id: 'B1', status: 'FREE', lot_id: 'lot-1' },
+      ];
+      mockParkingService.getDashboardByLot.mockResolvedValue(mockSlots as any);
 
       initSocketHandlers(mockIo);
+      await connectionCallback(mockSocket);
+      await socketEventHandlers['join:lot']!('lot-1');
 
-      await expect(connectionCallback(mockSocket)).resolves.not.toThrow();
-      expect(mockSocket.emit).not.toHaveBeenCalledWith('dashboard:init', expect.anything());
+      expect(mockSocket.join).toHaveBeenCalledWith('lot:lot-1');
+      expect(mockParkingService.getDashboardByLot).toHaveBeenCalledWith('lot-1');
+      expect(mockSocket.emit).toHaveBeenCalledWith('dashboard:init', mockSlots);
+    });
+
+    it('should leave previous lot room when joining a new one', async () => {
+      mockSocket.rooms = new Set(['test-socket-id', 'lot:lot-old']);
+      mockParkingService.getDashboardByLot.mockResolvedValue([]);
+
+      initSocketHandlers(mockIo);
+      await connectionCallback(mockSocket);
+      await socketEventHandlers['join:lot']!('lot-new');
+
+      expect(mockSocket.leave).toHaveBeenCalledWith('lot:lot-old');
+      expect(mockSocket.join).toHaveBeenCalledWith('lot:lot-new');
+    });
+
+    it('should leave lot room on leave:lot', async () => {
+      initSocketHandlers(mockIo);
+      await connectionCallback(mockSocket);
+      socketEventHandlers['leave:lot']!('lot-1');
+
+      expect(mockSocket.leave).toHaveBeenCalledWith('lot:lot-1');
+    });
+
+    it('should not crash if getDashboardByLot fails', async () => {
+      mockParkingService.getDashboardByLot.mockRejectedValue(new Error('DB down'));
+
+      initSocketHandlers(mockIo);
+      await connectionCallback(mockSocket);
+
+      await expect(socketEventHandlers['join:lot']!('lot-1')).resolves.not.toThrow();
     });
   });
 
   describe('emitSlotUpdate', () => {
-    it('should emit slot:update to all clients', () => {
+    it('should emit slot:update to the lot room', () => {
       initSocketHandlers(mockIo);
 
-      emitSlotUpdate({ slot_id: 'VIP-A1', status: 'OCCUPIED' });
+      emitSlotUpdate('lot-1', { slot_id: 'A1', status: 'OCCUPIED' });
 
-      expect(mockIo.emit).toHaveBeenCalledWith('slot:update', {
-        slot_id: 'VIP-A1',
+      expect(mockIo.to).toHaveBeenCalledWith('lot:lot-1');
+      expect(mockRoomEmit).toHaveBeenCalledWith('slot:update', {
+        slot_id: 'A1',
         status: 'OCCUPIED',
       });
     });
 
-    it('should include optional fields when provided', () => {
+    it('should include optional session fields when provided', () => {
       initSocketHandlers(mockIo);
 
-      emitSlotUpdate({
-        slot_id: 'GEN-B1',
+      emitSlotUpdate('lot-1', {
+        slot_id: 'B1',
         status: 'ASSIGNED',
-        slot_type: 'GENERAL',
         session: { session_id: 'sess-1', registration: '1กข 1234', province: 'กรุงเทพมหานคร' },
       });
 
-      expect(mockIo.emit).toHaveBeenCalledWith('slot:update', {
-        slot_id: 'GEN-B1',
+      expect(mockIo.to).toHaveBeenCalledWith('lot:lot-1');
+      expect(mockRoomEmit).toHaveBeenCalledWith('slot:update', {
+        slot_id: 'B1',
         status: 'ASSIGNED',
-        slot_type: 'GENERAL',
         session: { session_id: 'sess-1', registration: '1กข 1234', province: 'กรุงเทพมหานคร' },
       });
     });
   });
 
   describe('emitSessionClosed', () => {
-    it('should emit session:closed to all clients', () => {
+    it('should emit session:closed to the lot room', () => {
       initSocketHandlers(mockIo);
 
-      emitSessionClosed({
+      emitSessionClosed('lot-1', {
         session_id: 'sess-1',
-        slot_id: 'VIP-A1',
+        slot_id: 'A1',
         total_fee: 40,
         duration_minutes: 120,
       });
 
-      expect(mockIo.emit).toHaveBeenCalledWith('session:closed', {
+      expect(mockIo.to).toHaveBeenCalledWith('lot:lot-1');
+      expect(mockRoomEmit).toHaveBeenCalledWith('session:closed', {
         session_id: 'sess-1',
-        slot_id: 'VIP-A1',
+        slot_id: 'A1',
         total_fee: 40,
         duration_minutes: 120,
       });

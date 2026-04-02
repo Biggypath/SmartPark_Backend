@@ -18,21 +18,22 @@ export const startLprEntryConsumer = async () => {
     if (!msg) return;
     try {
       const event: LprEntryEvent = JSON.parse(msg.content.toString());
-      console.log(`[LPR Entry] ${event.registration} (${event.province})`);
+      console.log(`[LPR Entry] ${event.registration} (${event.province}) at lot ${event.lotId}`);
 
-      const result = await parkingService.handleLprEntry(event.registration, event.province);
+      const result = await parkingService.handleLprEntry(event.registration, event.province, event.lotId);
 
-      // Notify frontend via Socket.io
-      emitSlotUpdate({
-        slot_id: result.slot.slot_id,
-        status: 'ASSIGNED',
-        slot_type: result.slot.slot_type,
-        session: {
-          session_id: result.session.session_id,
-          registration: event.registration,
-          province: event.province,
-        },
-      });
+      if (result.slot) {
+        // Notify frontend via Socket.io (scoped to the lot room)
+        emitSlotUpdate(event.lotId, {
+          slot_id: result.slot.slot_id,
+          status: 'ASSIGNED',
+          session: {
+            session_id: result.session.session_id,
+            registration: event.registration,
+            province: event.province,
+          },
+        });
+      }
 
       channel.ack(msg);
     } catch (error) {
@@ -59,20 +60,20 @@ export const startSensorConsumer = async () => {
       console.log(`[Sensor] ${event.slotId} → ${event.status}`);
 
       if (event.status === 'OCCUPIED') {
-        await parkingService.handleSlotOccupation(event.slotId, event.rawData);
+        const result = await parkingService.handleSlotOccupation(event.slotId, event.rawData);
 
-        emitSlotUpdate({
+        emitSlotUpdate(result.slot.lot_id, {
           slot_id: event.slotId,
           status: 'OCCUPIED',
         });
       } else if (event.status === 'FREE') {
         const result = await parkingService.handleSlotExit(event.slotId, event.rawData);
 
-        emitSlotUpdate({
+        emitSlotUpdate(result.lotId, {
           slot_id: result.slotId,
           status: 'FREE',
         });
-        emitSessionClosed({
+        emitSessionClosed(result.lotId, {
           session_id: result.sessionId,
           slot_id: result.slotId,
           total_fee: result.totalFee,

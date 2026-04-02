@@ -2,6 +2,7 @@ jest.mock('../../../src/repositories/cardRepository.js', () => ({
   createCard: jest.fn(),
   findCardById: jest.fn(),
   findCardsByUserId: jest.fn(),
+  findProgramByBin: jest.fn(),
   updateCard: jest.fn(),
   deleteCard: jest.fn(),
 }));
@@ -29,14 +30,36 @@ describe('cardService', () => {
   });
 
   describe('addCard', () => {
-    it('should create a card', async () => {
-      const mockCard = { card_id: 'c1', user_id: 'u1', program_id: 'p1' } as any;
+    it('should derive fields from card number and create card', async () => {
+      const program = { program_id: 'p1', eligible_bins: ['411111'] } as any;
+      mockCardRepo.findProgramByBin.mockResolvedValue(program);
+      const mockCard = { card_id: 'c1' } as any;
       mockCardRepo.createCard.mockResolvedValue(mockCard);
 
-      const result = await cardService.addCard('u1', 'p1');
+      const result = await cardService.addCard('u1', '4111111111111111', 12, 2028);
 
+      expect(mockCardRepo.findProgramByBin).toHaveBeenCalledWith('411111');
+      expect(mockCardRepo.createCard).toHaveBeenCalledWith({
+        user_id: 'u1',
+        program_id: 'p1',
+        network: 'VISA',
+        bin: '411111',
+        last_four: '1111',
+        expiry_month: 12,
+        expiry_year: 2028,
+      });
       expect(result).toEqual(mockCard);
-      expect(mockCardRepo.createCard).toHaveBeenCalledWith({ user_id: 'u1', program_id: 'p1' });
+    });
+
+    it('should throw if card number is invalid', async () => {
+      await expect(cardService.addCard('u1', '123', 12, 2028)).rejects.toThrow('Invalid card number.');
+    });
+
+    it('should throw if no privilege program matches the BIN', async () => {
+      mockCardRepo.findProgramByBin.mockResolvedValue(null);
+
+      await expect(cardService.addCard('u1', '4111111111111111', 12, 2028))
+        .rejects.toThrow('No privilege program found for this card.');
     });
   });
 

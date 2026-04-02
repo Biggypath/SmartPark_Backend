@@ -13,13 +13,30 @@ export const initSocketHandlers = (io: Server) => {
   io.on('connection', async (socket: Socket) => {
     console.log(`[Socket.io] Client connected: ${socket.id}`);
 
-    // Send the full slot list so the 3D model can render initial state
-    try {
-      const slots = await parkingService.getDashboardData();
-      socket.emit('dashboard:init', slots);
-    } catch (error) {
-      console.error('[Socket.io] Failed to send dashboard data:', error);
-    }
+    // Client joins a parking lot room to receive updates for that lot only
+    socket.on('join:lot', async (lotId: string) => {
+      // Leave all previous lot rooms
+      for (const room of socket.rooms) {
+        if (room.startsWith('lot:')) {
+          socket.leave(room);
+        }
+      }
+      socket.join(`lot:${lotId}`);
+      console.log(`[Socket.io] ${socket.id} joined room lot:${lotId}`);
+
+      // Send the lot's slot data so the 3D model can render
+      try {
+        const slots = await parkingService.getDashboardByLot(lotId);
+        socket.emit('dashboard:init', slots);
+      } catch (error) {
+        console.error('[Socket.io] Failed to send lot dashboard data:', error);
+      }
+    });
+
+    socket.on('leave:lot', (lotId: string) => {
+      socket.leave(`lot:${lotId}`);
+      console.log(`[Socket.io] ${socket.id} left room lot:${lotId}`);
+    });
 
     socket.on('disconnect', () => {
       console.log(`[Socket.io] Client disconnected: ${socket.id}`);
@@ -28,30 +45,28 @@ export const initSocketHandlers = (io: Server) => {
 };
 
 /**
- * Emit a slot status change to all connected clients.
- * Used by consumers / services after any slot transition.
+ * Emit a slot status change to clients watching the specific lot.
  */
-export const emitSlotUpdate = (data: {
+export const emitSlotUpdate = (lotId: string, data: {
   slot_id: string;
   status: string;
-  slot_type?: string;
   session?: {
     session_id: string;
     registration?: string | null;
     province?: string | null;
   } | null;
 }) => {
-  ioInstance?.emit('slot:update', data);
+  ioInstance?.to(`lot:${lotId}`).emit('slot:update', data);
 };
 
 /**
- * Emit when a session is closed (car exits).
+ * Emit when a session is closed (car exits) to clients watching the specific lot.
  */
-export const emitSessionClosed = (data: {
+export const emitSessionClosed = (lotId: string, data: {
   session_id: string;
   slot_id: string;
   total_fee: number;
   duration_minutes: number;
 }) => {
-  ioInstance?.emit('session:closed', data);
+  ioInstance?.to(`lot:${lotId}`).emit('session:closed', data);
 };

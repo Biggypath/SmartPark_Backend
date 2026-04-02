@@ -16,12 +16,12 @@ export const getCards = async (req: AuthRequest, res: Response) => {
 export const addCard = async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user!.user_id;
-    const { program_id } = req.body;
-    if (!program_id) {
-      res.status(400).json({ error: 'program_id is required.' });
+    const { card_number, expiry_month, expiry_year } = req.body;
+    if (!card_number || expiry_month == null || expiry_year == null) {
+      res.status(400).json({ error: 'card_number, expiry_month, and expiry_year are required.' });
       return;
     }
-    const card = await cardService.addCard(userId, program_id);
+    const card = await cardService.addCard(userId, card_number, Number(expiry_month), Number(expiry_year));
     res.status(201).json(card);
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Failed to add card.';
