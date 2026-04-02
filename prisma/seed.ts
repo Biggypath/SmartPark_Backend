@@ -35,6 +35,8 @@ async function main() {
         email: "somchai@example.com",
         password_hash: passwordHash,
         name: "Somchai Jaidee",
+        birthday: new Date("1990-05-15"),
+        gender: "MALE",
       },
     }),
     prisma.user.create({
@@ -42,6 +44,8 @@ async function main() {
         email: "malee@example.com",
         password_hash: passwordHash,
         name: "Malee Suksri",
+        birthday: new Date("1995-08-22"),
+        gender: "FEMALE",
       },
     }),
   ]);
@@ -93,6 +97,8 @@ async function main() {
       data: {
         user_id: user1!.user_id,
         program_id: scbFirst!.program_id,
+        cardholder_name: "SOMCHAI JAIDEE",
+        label: "Personal Card",
         network: "VISA",
         bin: "412345",
         last_four: "1234",
@@ -104,6 +110,8 @@ async function main() {
       data: {
         user_id: user1!.user_id,
         program_id: the1Gold!.program_id,
+        cardholder_name: "SOMCHAI JAIDEE",
+        label: "Shopping Card",
         network: "MASTERCARD",
         bin: "456789",
         last_four: "5678",
@@ -115,6 +123,8 @@ async function main() {
       data: {
         user_id: user2!.user_id,
         program_id: the1Plat!.program_id,
+        cardholder_name: "MALEE SUKSRI",
+        label: "Work Card",
         network: "AMEX",
         bin: "371234",
         last_four: "9012",

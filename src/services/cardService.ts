@@ -21,7 +21,9 @@ export const addCard = async (
   userId: string,
   cardNumber: string,
   expiryMonth: number,
-  expiryYear: number
+  expiryYear: number,
+  cardholderName?: string,
+  label?: string
 ) => {
   const digits = cardNumber.replace(/\D/g, '');
 
@@ -42,6 +44,8 @@ export const addCard = async (
   return cardRepo.createCard({
     user_id: userId,
     program_id: program.program_id,
+    ...(cardholderName !== undefined && { cardholder_name: cardholderName }),
+    ...(label !== undefined && { label }),
     network,
     bin,
     last_four: lastFour,
@@ -50,7 +54,7 @@ export const addCard = async (
   });
 };
 
-export const updateCard = async (userId: string, cardId: string, data: { is_active?: boolean }) => {
+export const updateCard = async (userId: string, cardId: string, data: { is_active?: boolean; label?: string; cardholder_name?: string }) => {
   const card = await cardRepo.findCardById(cardId);
   if (!card) {
     throw new Error('Card not found.');

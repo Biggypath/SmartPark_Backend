@@ -4,6 +4,8 @@ import type { CardNetwork } from '@prisma/client';
 export const createCard = async (data: {
   user_id: string;
   program_id: string;
+  cardholder_name?: string;
+  label?: string;
   network: CardNetwork;
   bin: string;
   last_four: string;
@@ -29,7 +31,7 @@ export const findCardById = async (cardId: string) => {
   return prisma.userCard.findUnique({ where: { card_id: cardId } });
 };
 
-export const updateCard = async (cardId: string, data: { is_active?: boolean }) => {
+export const updateCard = async (cardId: string, data: { is_active?: boolean; label?: string; cardholder_name?: string }) => {
   return prisma.userCard.update({
     where: { card_id: cardId },
     data,

@@ -36,7 +36,7 @@ describe('cardService', () => {
       const mockCard = { card_id: 'c1' } as any;
       mockCardRepo.createCard.mockResolvedValue(mockCard);
 
-      const result = await cardService.addCard('u1', '4111111111111111', 12, 2028);
+      const result = await cardService.addCard('u1', '4111111111111111', 12, 2028, 'JOHN DOE', 'Personal');
 
       expect(mockCardRepo.findProgramByBin).toHaveBeenCalledWith('411111');
       expect(mockCardRepo.createCard).toHaveBeenCalledWith({
@@ -47,6 +47,8 @@ describe('cardService', () => {
         last_four: '1111',
         expiry_month: 12,
         expiry_year: 2028,
+        cardholder_name: 'JOHN DOE',
+        label: 'Personal',
       });
       expect(result).toEqual(mockCard);
     });

@@ -2,6 +2,7 @@ const mockPrisma = {
   user: {
     create: jest.fn(),
     findUnique: jest.fn(),
+    update: jest.fn(),
   },
 };
 
@@ -66,6 +67,21 @@ describe('userRepository', () => {
       const result = await userRepo.findUserById('nonexistent');
 
       expect(result).toBeNull();
+    });
+  });
+
+  describe('updateUser', () => {
+    it('should update user data', async () => {
+      const updated = { user_id: 'u1', name: 'New Name', gender: 'MALE' };
+      mockPrisma.user.update.mockResolvedValue(updated);
+
+      const result = await userRepo.updateUser('u1', { name: 'New Name', gender: 'MALE' });
+
+      expect(result).toEqual(updated);
+      expect(mockPrisma.user.update).toHaveBeenCalledWith({
+        where: { user_id: 'u1' },
+        data: { name: 'New Name', gender: 'MALE' },
+      });
     });
   });
 });

@@ -44,6 +44,13 @@ enum CardNetwork {
   OTHER
 }
 
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+  PREFER_NOT_TO_SAY
+}
+
 // ---------------------------------------------------------
 // Identity & Privilege Models
 // ---------------------------------------------------------
@@ -54,6 +61,8 @@ model User {
   password_hash String   // Stores the encrypted password (e.g., via bcrypt)
   name          String
   role          UserRole @default(USER)
+  birthday      DateTime? @db.Date
+  gender        Gender?
   created_at    DateTime @default(now())
 
   // Relations: A user can hold multiple different cards
@@ -85,6 +94,8 @@ model UserCard {
   program_id      String
   
   // Card Identity details (Safe to store)
+  cardholder_name String?     // e.g., "SOMCHAI JAIDEE"
+  label           String?     // e.g., "Personal Card", "Work Card"
   network         CardNetwork 
   bin             String      // First 6-8 digits (Used to match with PrivilegeProgram)
   last_four       String      // Last 4 digits (e.g., "1234") - safe to display on frontend

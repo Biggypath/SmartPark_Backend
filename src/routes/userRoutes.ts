@@ -3,11 +3,16 @@ import { authMiddleware } from '../middleware/authMiddleware.js';
 import * as cardController from '../controllers/cardController.js';
 import * as vehicleController from '../controllers/vehicleController.js';
 import * as parkingController from '../controllers/parkingController.js';
+import * as profileController from '../controllers/profileController.js';
 
 const router = Router();
 
 // All user routes require authentication
 router.use(authMiddleware);
+
+// Profile
+router.get('/profile', profileController.getProfile);
+router.put('/profile', profileController.updateProfile);
 
 // Card management
 router.get('/cards', cardController.getCards);

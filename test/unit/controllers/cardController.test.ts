@@ -52,7 +52,7 @@ describe('cardController', () => {
     it('should return 201 with created card', async () => {
       const req = {
         user: { user_id: 'u1' },
-        body: { card_number: '4111111111111111', expiry_month: 12, expiry_year: 2028 },
+        body: { card_number: '4111111111111111', expiry_month: 12, expiry_year: 2028, cardholder_name: 'JOHN DOE', label: 'Personal' },
       } as AuthRequest;
       const res = mockRes();
       const card = { card_id: 'c1', user_id: 'u1', program_id: 'p1' };
@@ -60,7 +60,7 @@ describe('cardController', () => {
 
       await cardController.addCard(req, res);
 
-      expect(mockCardService.addCard).toHaveBeenCalledWith('u1', '4111111111111111', 12, 2028);
+      expect(mockCardService.addCard).toHaveBeenCalledWith('u1', '4111111111111111', 12, 2028, 'JOHN DOE', 'Personal');
       expect(res.status).toHaveBeenCalledWith(201);
       expect(res.json).toHaveBeenCalledWith(card);
     });
