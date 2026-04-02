@@ -67,24 +67,32 @@ async function main() {
       data: {
         provider_name: "SCB First",
         tier: "Private Banking",
-        eligible_bins: ["412345", "543210"],
+        eligible_bins: ["541000"],
         max_vehicles: 3,
       },
     }),
     prisma.privilegeProgram.create({
       data: {
         provider_name: "The 1 Card",
-        tier: "Gold",
-        eligible_bins: ["456789"],
+        tier: "Black",
+        eligible_bins: ["528500"],
         max_vehicles: 2,
       },
     }),
     prisma.privilegeProgram.create({
       data: {
-        provider_name: "The 1 Card",
+        provider_name: "Kasikorn The Wisdom",
         tier: "Platinum",
-        eligible_bins: ["371234"],
+        eligible_bins: ["488800"],
         max_vehicles: 3,
+      },
+    }),
+     prisma.privilegeProgram.create({
+      data: {
+        provider_name: "KTC Ultimate",
+        tier: "ULTIMATE",
+        eligible_bins: ["356300"],
+        max_vehicles: 1,
       },
     }),
   ]);
