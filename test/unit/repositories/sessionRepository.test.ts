@@ -114,7 +114,7 @@ describe('sessionRepository', () => {
         exit_time: null,
         slot: { slot_id: 'A1', status: 'OCCUPIED' },
         vehicle: {
-          cards: [{ is_active: true, program: { free_hours: 5 } }],
+          cards: [{ is_active: true, program: {} }],
         },
       };
       mockPrisma.parkingSession.findFirst.mockResolvedValue(mockSession);

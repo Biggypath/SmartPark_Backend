@@ -129,7 +129,7 @@ export const handleSlotOccupation = async (slotId: string, rawData?: string) => 
 /**
  * Handle Slot Exit Event (ESP32 sensor detects car left):
  * 1. Find active session by slot.
- * 2. Calculate fee (with privilege free_hours if registered).
+ * 2. Calculate fee.
  * 3. Close session, free slot.
  */
 export const handleSlotExit = async (slotId: string, rawData?: string) => {
@@ -150,31 +150,8 @@ export const handleSlotExit = async (slotId: string, rawData?: string) => {
 
     const now = new Date();
 
-    // Determine free hours from privilege cards
-    let freeHours = 0;
-    if (session.vehicle_id) {
-      const vehicle = await tx.registeredVehicle.findUnique({
-        where: { vehicle_id: session.vehicle_id },
-        include: {
-          cards: {
-            where: { is_active: true },
-            include: { program: { select: { free_hours: true, is_active: true } } }
-          }
-        }
-      });
-
-      if (vehicle?.cards) {
-        // Conflict resolution: pick the card with the highest free_hours
-        for (const card of vehicle.cards) {
-          if (card.program.is_active && card.program.free_hours > freeHours) {
-            freeHours = card.program.free_hours;
-          }
-        }
-      }
-    }
-
     // Calculate fee
-    const feeResult = calculateFee(session.entry_time, now, freeHours);
+    const feeResult = calculateFee(session.entry_time, now);
 
     // Close session
     await tx.parkingSession.update({
@@ -227,17 +204,7 @@ export const checkSession = async (registration: string, province: string) => {
   const durationMs = now.getTime() - session.entry_time.getTime();
   const durationMinutes = Math.round(durationMs / 60000);
 
-  // Determine free hours from privilege cards if registered
-  let freeHours = 0;
-  if (session.vehicle) {
-    for (const card of session.vehicle.cards) {
-      if (card.program.is_active && card.program.free_hours > freeHours) {
-        freeHours = card.program.free_hours;
-      }
-    }
-  }
-
-  const estimatedFee = calculateFee(session.entry_time, now, freeHours);
+  const estimatedFee = calculateFee(session.entry_time, now);
 
   return {
     session_id: session.session_id,
@@ -251,7 +218,6 @@ export const checkSession = async (registration: string, province: string) => {
     entry_time: session.entry_time,
     duration_minutes: durationMinutes,
     estimated_fee: estimatedFee.totalFee,
-    free_hours: freeHours,
     payment_status: session.payment_status,
   };
 };

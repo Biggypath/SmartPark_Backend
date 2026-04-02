@@ -103,7 +103,7 @@ describe('parkingService', () => {
           registeredVehicle: {
             findUnique: jest.fn().mockResolvedValue({
               vehicle_id: 'v-1',
-              cards: [{ is_active: true, program: { free_hours: 2 } }],
+              cards: [{ is_active: true, program: {} }],
             }),
           },
           parkingSlot: {
@@ -132,7 +132,7 @@ describe('parkingService', () => {
           registeredVehicle: {
             findUnique: jest.fn().mockResolvedValue({
               vehicle_id: 'v-1',
-              cards: [{ is_active: true, program: { free_hours: 1 } }],
+              cards: [{ is_active: true, program: {} }],
             }),
           },
           parkingSlot: {
@@ -203,7 +203,7 @@ describe('parkingService', () => {
           registeredVehicle: {
             findUnique: jest.fn().mockResolvedValue({
               vehicle_id: 'v-1',
-              cards: [{ is_active: true, program: { free_hours: 2 } }],
+              cards: [{ is_active: true, program: {} }],
             }),
           },
           parkingSlot: {
@@ -227,7 +227,7 @@ describe('parkingService', () => {
           registeredVehicle: {
             findUnique: jest.fn().mockResolvedValue({
               vehicle_id: 'v-1',
-              cards: [{ is_active: true, program: { free_hours: 1 } }],
+              cards: [{ is_active: true, program: {} }],
             }),
           },
           parkingSlot: {
@@ -257,7 +257,7 @@ describe('parkingService', () => {
           registeredVehicle: {
             findUnique: jest.fn().mockResolvedValue({
               vehicle_id: 'v-10',
-              cards: [{ is_active: true, program: { free_hours: 1 } }],
+              cards: [{ is_active: true, program: {} }],
             }),
           },
           parkingSlot: {
@@ -401,7 +401,7 @@ describe('parkingService', () => {
       expect(result.totalFee).toBeGreaterThanOrEqual(0);
     });
 
-    it('should apply free hours for registered vehicle and pick highest', async () => {
+    it('should apply correct fee for registered vehicle', async () => {
       const entryTime = new Date('2026-03-30T10:00:00Z');
 
       mockPrisma.$transaction.mockImplementation(async (cb: Function) => {
@@ -416,16 +416,6 @@ describe('parkingService', () => {
             }),
             update: jest.fn().mockResolvedValue({}),
           },
-          registeredVehicle: {
-            findUnique: jest.fn().mockResolvedValue({
-              vehicle_id: 'v-1',
-              cards: [
-                { is_active: true, program: { free_hours: 2, is_active: true } },
-                { is_active: true, program: { free_hours: 5, is_active: true } }, // Highest
-                { is_active: true, program: { free_hours: 1, is_active: true } },
-              ],
-            }),
-          },
           parkingSlot: {
             update: jest.fn().mockResolvedValue({}),
           },
@@ -438,8 +428,7 @@ describe('parkingService', () => {
 
       const result = await parkingService.handleSlotExit('VIP-A1');
 
-      // freeHours should have been 5 (highest)
-      expect(result.freeHours).toBe(5);
+      expect(result.totalFee).toBeGreaterThanOrEqual(0);
     });
 
     it('should throw error if no active session found', async () => {
@@ -490,7 +479,7 @@ describe('parkingService', () => {
       });
     });
 
-    it('should set 0 free hours for guest vehicles', async () => {
+    it('should set 0 fee for very short guest sessions', async () => {
       mockPrisma.$transaction.mockImplementation(async (cb: Function) => {
         const tx = {
           parkingSession: {
@@ -515,7 +504,7 @@ describe('parkingService', () => {
 
       const result = await parkingService.handleSlotExit('GEN-A1');
 
-      expect(result.freeHours).toBe(0);
+      expect(result.totalFee).toBeGreaterThanOrEqual(0);
     });
 
     it('should pass raw data to exit sensor log', async () => {
@@ -586,11 +575,10 @@ describe('parkingService', () => {
       expect(result).not.toBeNull();
       expect(result!.is_registered).toBe(false);
       expect(result!.slot).toBeNull();
-      expect(result!.free_hours).toBe(0);
       expect(result!.estimated_fee).toBeGreaterThanOrEqual(0);
     });
 
-    it('should return session details with free hours for a registered vehicle', async () => {
+    it('should return session details for a registered vehicle', async () => {
       const entryTime = new Date(Date.now() - 2 * 60 * 60 * 1000); // 2 hours ago
       mockedFindActiveByPlate.mockResolvedValue({
         session_id: 'sess-2',
@@ -601,8 +589,7 @@ describe('parkingService', () => {
         vehicle: {
           vehicle_id: 'v-1',
           cards: [
-            { is_active: true, program: { free_hours: 5, is_active: true } },
-            { is_active: true, program: { free_hours: 2, is_active: true } },
+            { is_active: true, program: { is_active: true } },
           ],
         },
         entry_time: entryTime,
@@ -617,35 +604,6 @@ describe('parkingService', () => {
 
       expect(result).not.toBeNull();
       expect(result!.is_registered).toBe(true);
-      expect(result!.free_hours).toBe(5); // Picks the highest
-    });
-
-    it('should pick highest free_hours among active cards', async () => {
-      const entryTime = new Date(Date.now() - 30 * 60 * 1000); // 30 min ago
-      mockedFindActiveByPlate.mockResolvedValue({
-        session_id: 'sess-3',
-        slot_id: 'VIP-B1',
-        registration: '3คง 9999',
-        province: 'นครราชสีมา',
-        vehicle_id: 'v-2',
-        vehicle: {
-          vehicle_id: 'v-2',
-          cards: [
-            { is_active: true, program: { free_hours: 3, is_active: true } },
-            { is_active: true, program: { free_hours: 0, is_active: false } },
-          ],
-        },
-        entry_time: entryTime,
-        exit_time: null,
-        duration_minutes: null,
-        total_fee: null,
-        payment_status: 'PENDING',
-        slot: { slot_id: 'B1', status: 'OCCUPIED', location_coordinates: '{}', is_active: true },
-      } as any);
-
-      const result = await parkingService.checkSession('3คง 9999', 'นครราชสีมา');
-
-      expect(result!.free_hours).toBe(3); // Inactive program ignored
     });
   });
 

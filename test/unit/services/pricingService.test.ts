@@ -16,17 +16,16 @@ describe('pricingService', () => {
   });
 
   describe('calculateFee', () => {
-    it('should calculate fee with custom rate, no free hours', () => {
+    it('should calculate fee with custom rate', () => {
       const entry = new Date('2026-03-30T10:00:00Z');
       const exit = new Date('2026-03-30T12:30:00Z');
 
-      const result = calculateFee(entry, exit, 0, 25);
+      const result = calculateFee(entry, exit, 25);
 
       // 2h30m → ceil to 3h → 3 * 25 = 75
       expect(result.totalFee).toBe(75);
       expect(result.durationMinutes).toBe(150);
       expect(result.billableHours).toBe(3);
-      expect(result.freeHours).toBe(0);
       expect(result.ratePerHour).toBe(25);
     });
 
@@ -45,46 +44,34 @@ describe('pricingService', () => {
       const entry = new Date('2026-03-30T10:00:00Z');
       const exit = new Date('2026-03-30T13:00:00Z');
 
-      const result = calculateFee(entry, exit, 2, 20);
+      const result = calculateFee(entry, exit, 20);
 
-      // 3 hours parked - 2 free hours = 1 billable hour → 1 * 20 = 20
-      expect(result.totalFee).toBe(20);
-      expect(result.billableHours).toBe(1);
-      expect(result.freeHours).toBe(2);
+      // 3 hours parked → ceil to 3h → 3 * 20 = 60
+      expect(result.totalFee).toBe(60);
+      expect(result.billableHours).toBe(3);
     });
 
-    it('should not produce negative fee when free hours exceed duration', () => {
-      const entry = new Date('2026-03-30T10:00:00Z');
-      const exit = new Date('2026-03-30T11:00:00Z');
-
-      const result = calculateFee(entry, exit, 5, 20);
-
-      // 1 hour - 5 free hours → max(0, -4) = 0 billable
-      expect(result.totalFee).toBe(0);
-      expect(result.billableHours).toBe(0);
-    });
-
-    it('should round up partial hours before subtracting free hours', () => {
+    it('should handle short duration parking', () => {
       const entry = new Date('2026-03-30T10:00:00Z');
       const exit = new Date('2026-03-30T10:15:00Z');
 
-      const result = calculateFee(entry, exit, 0, 10);
+      const result = calculateFee(entry, exit, 20);
 
-      // 15 min → ceil to 1h → 1 * 10 = 10
-      expect(result.totalFee).toBe(10);
+      // 15 min → ceil to 1h → 1 * 20 = 20
+      expect(result.totalFee).toBe(20);
       expect(result.durationMinutes).toBe(15);
       expect(result.billableHours).toBe(1);
     });
 
-    it('should handle exactly the free hours duration', () => {
+    it('should handle exact hour duration', () => {
       const entry = new Date('2026-03-30T10:00:00Z');
       const exit = new Date('2026-03-30T12:00:00Z');
 
-      const result = calculateFee(entry, exit, 2, 20);
+      const result = calculateFee(entry, exit, 20);
 
-      // 2 hours - 2 free = 0 billable
-      expect(result.totalFee).toBe(0);
-      expect(result.billableHours).toBe(0);
+      // 2 hours → 2 * 20 = 40
+      expect(result.totalFee).toBe(40);
+      expect(result.billableHours).toBe(2);
     });
 
     it('should return the exit time passed', () => {

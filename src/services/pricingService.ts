@@ -18,19 +18,17 @@ export const getActiveRate = async (): Promise<number> => {
 export const calculateFee = (
   entryTime: Date,
   exitTime: Date,
-  freeHours: number = 0,
   ratePerHour: number = 20.0
 ): ExitFeeResult => {
   const durationMs = exitTime.getTime() - entryTime.getTime();
   const durationMinutes = durationMs / 60000;
   const durationHours = durationMs / (1000 * 60 * 60);
 
-  const billableHours = Math.max(0, Math.ceil(durationHours) - freeHours);
+  const billableHours = Math.ceil(durationHours);
   const totalFee = billableHours * ratePerHour;
 
   return {
     durationMinutes,
-    freeHours,
     billableHours,
     ratePerHour,
     totalFee,

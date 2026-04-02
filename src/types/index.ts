@@ -19,7 +19,6 @@ export interface SensorSlotEvent {
 // 3. Response Object for Fee Calculation
 export interface ExitFeeResult {
   durationMinutes: number;
-  freeHours: number;
   billableHours: number;
   ratePerHour: number;
   totalFee: number;

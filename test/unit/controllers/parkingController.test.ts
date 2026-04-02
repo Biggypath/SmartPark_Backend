@@ -159,7 +159,6 @@ describe('parkingController', () => {
         entry_time: new Date(),
         duration_minutes: 60,
         estimated_fee: 0,
-        free_hours: 5,
         payment_status: 'PENDING',
       };
       const req = { query: { registration: '1กข 1234', province: 'กรุงเทพมหานคร' } } as any;
