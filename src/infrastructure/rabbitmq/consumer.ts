@@ -1,32 +1,33 @@
 import { getChannel, QUEUES } from './connection.js';
 import * as parkingService from '../../services/parkingService.js';
+import { sendEntryAck, sendExitAck } from './producer.js';
 import { emitSlotUpdate, emitSessionClosed } from '../socket/socketHandler.js';
 import type { ConsumeMessage } from 'amqplib';
-import type { LprEntryEvent, SensorSlotEvent } from '../../types/index.js';
+import type { OcrEntryEvent, OcrExitEvent } from '../../types/index.js';
 
 /**
- * Consumer: LPR Entry Events
- * Triggered when a camera reads a plate at the entrance.
+ * Consumer: OCR Entry Events
+ * Triggered when the ThaiLicensePlateOCR server reads a plate at the entrance.
  */
-export const startLprEntryConsumer = async () => {
+export const startOcrEntryConsumer = async () => {
   const channel = getChannel();
-  const queue = QUEUES.LPR_ENTRY;
+  const queue = QUEUES.OCR_ENTRY;
 
   console.log(`Listening on queue: ${queue}`);
 
   channel.consume(queue, async (msg: ConsumeMessage | null) => {
     if (!msg) return;
     try {
-      const event: LprEntryEvent = JSON.parse(msg.content.toString());
-      console.log(`[LPR Entry] ${event.registration} (${event.province}) at lot ${event.lotId}`);
+      const event: OcrEntryEvent = JSON.parse(msg.content.toString());
+      console.log(`[OCR Entry] ${event.registration} (${event.province}) at lot ${event.lotId}`);
 
-      const result = await parkingService.handleLprEntry(event.registration, event.province, event.lotId);
+      const result = await parkingService.handleOcrEntry(event.registration, event.province, event.lotId);
 
       if (result.slot) {
-        // Notify frontend via Socket.io (scoped to the lot room)
+        // Notify frontend via Socket.io — slot is now OCCUPIED
         emitSlotUpdate(event.lotId, {
           slot_id: result.slot.slot_id,
-          status: 'ASSIGNED',
+          status: 'OCCUPIED',
           session: {
             session_id: result.session.session_id,
             registration: event.registration,
@@ -35,55 +36,98 @@ export const startLprEntryConsumer = async () => {
         });
       }
 
+      // Send ACK back to ThaiLicensePlateOCR
+      await sendEntryAck({
+        camId: event.camId,
+        lotId: event.lotId,
+        registration: event.registration,
+        province: event.province,
+        status: 'ALLOWED',
+        slotId: result.slot?.slot_id,
+      });
+
       channel.ack(msg);
     } catch (error) {
-      console.error('[LPR Entry] Error:', error);
+      console.error('[OCR Entry] Error:', error);
+
+      // Try to parse event for rejection ACK
+      try {
+        const event: OcrEntryEvent = JSON.parse(msg.content.toString());
+        await sendEntryAck({
+          camId: event.camId,
+          lotId: event.lotId,
+          registration: event.registration,
+          province: event.province,
+          status: 'REJECTED',
+          reason: error instanceof Error ? error.message : 'Unknown error',
+        });
+      } catch { /* ignore parse errors */ }
+
       channel.ack(msg);
     }
   });
 };
 
 /**
- * Consumer: Sensor Slot Events (ESP32 IR sensor)
- * Triggered when the physical sensor detects a car has parked.
+ * Consumer: OCR Exit Events
+ * Triggered when the ThaiLicensePlateOCR server reads a plate at the exit.
  */
-export const startSensorConsumer = async () => {
+export const startOcrExitConsumer = async () => {
   const channel = getChannel();
-  const queue = QUEUES.SENSOR_SLOT;
+  const queue = QUEUES.OCR_EXIT;
 
   console.log(`Listening on queue: ${queue}`);
 
   channel.consume(queue, async (msg: ConsumeMessage | null) => {
     if (!msg) return;
     try {
-      const event: SensorSlotEvent = JSON.parse(msg.content.toString());
-      console.log(`[Sensor] ${event.slotId} → ${event.status}`);
+      const event: OcrExitEvent = JSON.parse(msg.content.toString());
+      console.log(`[OCR Exit] ${event.registration} (${event.province}) at lot ${event.lotId}`);
 
-      if (event.status === 'OCCUPIED') {
-        const result = await parkingService.handleSlotOccupation(event.slotId, event.rawData);
+      const result = await parkingService.handleOcrExit(event.registration, event.province, event.lotId);
 
-        emitSlotUpdate(result.slot.lot_id, {
-          slot_id: event.slotId,
-          status: 'OCCUPIED',
-        });
-      } else if (event.status === 'FREE') {
-        const result = await parkingService.handleSlotExit(event.slotId, event.rawData);
-
+      if (result.slotId) {
         emitSlotUpdate(result.lotId, {
           slot_id: result.slotId,
           status: 'FREE',
         });
-        emitSessionClosed(result.lotId, {
-          session_id: result.sessionId,
-          slot_id: result.slotId,
-          total_fee: result.totalFee,
-          duration_minutes: result.durationMinutes,
-        });
       }
+
+      emitSessionClosed(result.lotId, {
+        session_id: result.sessionId,
+        slot_id: result.slotId ?? '',
+        total_fee: result.totalFee,
+        duration_minutes: result.durationMinutes,
+      });
+
+      // Send ACK back to ThaiLicensePlateOCR
+      await sendExitAck({
+        camId: event.camId,
+        lotId: event.lotId,
+        registration: event.registration,
+        province: event.province,
+        status: 'OK',
+        totalFee: result.totalFee,
+        durationMinutes: result.durationMinutes,
+      });
 
       channel.ack(msg);
     } catch (error) {
-      console.error('[Sensor] Error:', error);
+      console.error('[OCR Exit] Error:', error);
+
+      // Try to parse event for error ACK
+      try {
+        const event: OcrExitEvent = JSON.parse(msg.content.toString());
+        await sendExitAck({
+          camId: event.camId,
+          lotId: event.lotId,
+          registration: event.registration,
+          province: event.province,
+          status: 'ERROR',
+          reason: error instanceof Error ? error.message : 'Unknown error',
+        });
+      } catch { /* ignore parse errors */ }
+
       channel.ack(msg);
     }
   });
@@ -93,7 +137,7 @@ export const startSensorConsumer = async () => {
  * Start all consumers.
  */
 export const startAllConsumers = async () => {
-  await startLprEntryConsumer();
-  await startSensorConsumer();
+  await startOcrEntryConsumer();
+  await startOcrExitConsumer();
   console.log('All RabbitMQ consumers started.');
 };

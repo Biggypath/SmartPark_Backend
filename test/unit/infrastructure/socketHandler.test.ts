@@ -120,14 +120,14 @@ describe('socketHandler', () => {
 
       emitSlotUpdate('lot-1', {
         slot_id: 'B1',
-        status: 'ASSIGNED',
+        status: 'OCCUPIED',
         session: { session_id: 'sess-1', registration: '1กข 1234', province: 'กรุงเทพมหานคร' },
       });
 
       expect(mockIo.to).toHaveBeenCalledWith('lot:lot-1');
       expect(mockRoomEmit).toHaveBeenCalledWith('slot:update', {
         slot_id: 'B1',
-        status: 'ASSIGNED',
+        status: 'OCCUPIED',
         session: { session_id: 'sess-1', registration: '1กข 1234', province: 'กรุงเทพมหานคร' },
       });
     });

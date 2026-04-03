@@ -1,7 +1,6 @@
 import { prisma } from '../config/db.js';
 import * as slotRepo from '../repositories/slotRepository.js';
 import * as sessionRepo from '../repositories/sessionRepository.js';
-import * as logRepo from '../repositories/logRepository.js';
 import { calculateFee } from './pricingService.js';
 
 /**
@@ -46,12 +45,12 @@ export const getDashboardData = async () => {
 };
 
 /**
- * Handle LPR Entry Event:
+ * Handle OCR Entry Event:
  * 1. Look up vehicle in RegisteredVehicle by composite key.
- * 2. If registered with active cards → assign a free slot and mark ASSIGNED.
+ * 2. If registered with active cards → assign a free slot and mark OCCUPIED.
  * 3. If guest/unregistered → create session only (no slot assigned).
  */
-export const handleLprEntry = async (registration: string, province: string, lotId: string) => {
+export const handleOcrEntry = async (registration: string, province: string, lotId: string) => {
   return await prisma.$transaction(async (tx) => {
     // Look up registered vehicle with active cards
     const vehicle = await tx.registeredVehicle.findUnique({
@@ -78,10 +77,10 @@ export const handleLprEntry = async (registration: string, province: string, lot
         throw new Error('No available parking slots.');
       }
 
-      // Mark slot as ASSIGNED
+      // Mark slot as OCCUPIED directly (no ASSIGNED intermediate state)
       await tx.parkingSlot.update({
         where: { slot_id: slot.slot_id },
-        data: { status: 'ASSIGNED' }
+        data: { status: 'OCCUPIED' }
       });
     }
 
@@ -97,55 +96,37 @@ export const handleLprEntry = async (registration: string, province: string, lot
       }
     });
 
-    return { session, slot };
+    // Log entry event
+    if (slot) {
+      await tx.sensorLog.create({
+        data: {
+          slot_id: slot.slot_id,
+          event_type: 'ENTRY',
+          raw_data: `OCR_ENTRY: ${registration} ${province}`
+        }
+      });
+    }
+
+    return { session, slot, isRegistered };
   });
 };
 
 /**
- * Handle Slot Occupation Event (ESP32 IR sensor):
- * Transition slot from ASSIGNED → OCCUPIED when car physically parks.
- */
-export const handleSlotOccupation = async (slotId: string, rawData?: string) => {
-  const slot = await slotRepo.findSlotById(slotId);
-  if (!slot) {
-    throw new Error(`Slot ${slotId} not found.`);
-  }
-
-  if (slot.status !== 'ASSIGNED') {
-    throw new Error(`Slot ${slotId} is not in ASSIGNED state (current: ${slot.status}).`);
-  }
-
-  // Transition to OCCUPIED
-  await slotRepo.updateSlotStatus(slotId, 'OCCUPIED');
-
-  // Log sensor event
-  await logRepo.createLog(slotId, 'ENTRY', rawData ?? 'IR_TRIGGERED');
-
-  // Verify active session exists
-  const session = await sessionRepo.findActiveSessionBySlot(slotId);
-  return { slot: { ...slot, status: 'OCCUPIED' }, session };
-};
-
-/**
- * Handle Slot Exit Event (ESP32 sensor detects car left):
- * 1. Find active session by slot.
+ * Handle OCR Exit Event:
+ * 1. Find active session by license plate.
  * 2. Calculate fee.
  * 3. Close session, free slot.
  */
-export const handleSlotExit = async (slotId: string, rawData?: string) => {
+export const handleOcrExit = async (registration: string, province: string, lotId: string) => {
   return await prisma.$transaction(async (tx) => {
-    // Find active session by slot
+    // Find active session by license plate
     const session = await tx.parkingSession.findFirst({
-      where: { slot_id: slotId, exit_time: null },
+      where: { registration, province, exit_time: null },
       include: { slot: { select: { lot_id: true } } }
     });
 
     if (!session) {
-      throw new Error(`No active parking session found for slot ${slotId}.`);
-    }
-
-    if (!session.slot_id) {
-      throw new Error(`Session ${session.session_id} has no assigned slot.`);
+      throw new Error(`No active parking session found for ${registration} (${province}).`);
     }
 
     const now = new Date();
@@ -164,25 +145,27 @@ export const handleSlotExit = async (slotId: string, rawData?: string) => {
       }
     });
 
-    // Free the slot
-    await tx.parkingSlot.update({
-      where: { slot_id: session.slot_id },
-      data: { status: 'FREE' }
-    });
+    // Free the slot if one was assigned
+    if (session.slot_id) {
+      await tx.parkingSlot.update({
+        where: { slot_id: session.slot_id },
+        data: { status: 'FREE' }
+      });
 
-    // Log sensor event
-    await tx.sensorLog.create({
-      data: {
-        slot_id: session.slot_id,
-        event_type: 'EXIT',
-        raw_data: rawData ?? 'IR_DEPARTED'
-      }
-    });
+      // Log exit event
+      await tx.sensorLog.create({
+        data: {
+          slot_id: session.slot_id,
+          event_type: 'EXIT',
+          raw_data: `OCR_EXIT: ${registration} ${province}`
+        }
+      });
+    }
 
     return {
       sessionId: session.session_id,
       slotId: session.slot_id,
-      lotId: session.slot!.lot_id,
+      lotId: session.slot?.lot_id ?? lotId,
       ...feeResult
     };
   });

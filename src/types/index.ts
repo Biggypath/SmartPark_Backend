@@ -2,21 +2,46 @@
 
 import type { Request } from 'express';
 
-// 1. LPR Camera Events (from LPR server via RabbitMQ)
-export interface LprEntryEvent {
+// 1. OCR Entry Event (from ThaiLicensePlateOCR server via RabbitMQ)
+export interface OcrEntryEvent {
   registration: string;  // e.g. "1กข 1234"
   province: string;      // e.g. "กรุงเทพมหานคร"
   lotId: string;         // Which parking lot this camera belongs to
+  camId?: string;        // Camera identifier
 }
 
-// 2. ESP32 Sensor Events (from IoT hardware via RabbitMQ)
-export interface SensorSlotEvent {
-  slotId: string;
-  status: 'OCCUPIED' | 'FREE';
-  rawData?: string;      // Raw IR sensor value
+// 2. OCR Exit Event (from ThaiLicensePlateOCR server via RabbitMQ)
+export interface OcrExitEvent {
+  registration: string;
+  province: string;
+  lotId: string;
+  camId?: string;
 }
 
-// 3. Response Object for Fee Calculation
+// 3. Entry ACK (sent back to ThaiLicensePlateOCR)
+export interface OcrEntryAck {
+  camId?: string | undefined;
+  lotId: string;
+  registration: string;
+  province: string;
+  status: 'ALLOWED' | 'REJECTED';
+  slotId?: string | undefined;
+  reason?: string | undefined;
+}
+
+// 4. Exit ACK (sent back to ThaiLicensePlateOCR)
+export interface OcrExitAck {
+  camId?: string | undefined;
+  lotId: string;
+  registration: string;
+  province: string;
+  status: 'OK' | 'ERROR';
+  totalFee?: number;
+  durationMinutes?: number;
+  reason?: string;
+}
+
+// 5. Response Object for Fee Calculation
 export interface ExitFeeResult {
   durationMinutes: number;
   billableHours: number;
@@ -25,7 +50,7 @@ export interface ExitFeeResult {
   exitTime: Date;
 }
 
-// 4. Authenticated Request (JWT payload attached by authMiddleware)
+// 6. Authenticated Request (JWT payload attached by authMiddleware)
 export interface AuthRequest extends Request {
   user?: { user_id: string; role: string };
 }

@@ -5,9 +5,10 @@ const RABBITMQ_URL = process.env.RABBITMQ_URL || 'amqp://localhost';
 
 // Queue names
 export const QUEUES = {
-  LPR_ENTRY: 'lpr.entry.events',
-  SENSOR_SLOT: 'sensor.slot.events',
-  GATE_COMMANDS: 'gate.commands'
+  OCR_ENTRY: 'ocr.entry.events',
+  OCR_EXIT: 'ocr.exit.events',
+  OCR_ENTRY_ACK: 'ocr.entry.ack',
+  OCR_EXIT_ACK: 'ocr.exit.ack',
 } as const;
 
 let connection: Connection | null = null;
@@ -21,9 +22,10 @@ export const connectRabbitMQ = async (): Promise<Channel> => {
     console.log('Connected to RabbitMQ');
 
     // Assert all queues (idempotent)
-    await channel.assertQueue(QUEUES.LPR_ENTRY, { durable: true });
-    await channel.assertQueue(QUEUES.SENSOR_SLOT, { durable: true });
-    await channel.assertQueue(QUEUES.GATE_COMMANDS, { durable: true });
+    await channel.assertQueue(QUEUES.OCR_ENTRY, { durable: true });
+    await channel.assertQueue(QUEUES.OCR_EXIT, { durable: true });
+    await channel.assertQueue(QUEUES.OCR_ENTRY_ACK, { durable: true });
+    await channel.assertQueue(QUEUES.OCR_EXIT_ACK, { durable: true });
 
     return channel;
   } catch (error) {

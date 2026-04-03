@@ -1,14 +1,22 @@
 import { getChannel, QUEUES } from './connection.js';
+import type { OcrEntryAck, OcrExitAck } from '../../types/index.js';
 
-export const sendGateCommand = async (gateId: string, command: 'OPEN' | 'CLOSE') => {
+/**
+ * Send entry ACK back to ThaiLicensePlateOCR server.
+ */
+export const sendEntryAck = async (ack: OcrEntryAck) => {
   const channel = getChannel();
+  const message = JSON.stringify({ ...ack, timestamp: new Date().toISOString() });
+  channel.sendToQueue(QUEUES.OCR_ENTRY_ACK, Buffer.from(message), { persistent: true });
+  console.log(`[Entry ACK] ${ack.status} for ${ack.registration} at lot ${ack.lotId}`);
+};
 
-  const message = JSON.stringify({
-    gateId,
-    command,
-    timestamp: new Date().toISOString()
-  });
-
-  channel.sendToQueue(QUEUES.GATE_COMMANDS, Buffer.from(message), { persistent: true });
-  console.log(`Sent Gate Command: ${command} to ${gateId}`);
+/**
+ * Send exit ACK back to ThaiLicensePlateOCR server.
+ */
+export const sendExitAck = async (ack: OcrExitAck) => {
+  const channel = getChannel();
+  const message = JSON.stringify({ ...ack, timestamp: new Date().toISOString() });
+  channel.sendToQueue(QUEUES.OCR_EXIT_ACK, Buffer.from(message), { persistent: true });
+  console.log(`[Exit ACK] ${ack.status} for ${ack.registration} at lot ${ack.lotId}`);
 };

@@ -3,7 +3,7 @@ jest.mock('../../../src/services/parkingService.js', () => ({
   getLots: jest.fn(),
   getDashboardByLot: jest.fn(),
   getParkingHistory: jest.fn(),
-  handleLprEntry: jest.fn(),
+  handleOcrEntry: jest.fn(),
   handleSlotOccupation: jest.fn(),
   handleSlotExit: jest.fn(),
   checkSession: jest.fn(),

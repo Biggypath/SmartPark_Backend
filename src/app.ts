@@ -45,7 +45,7 @@ const startServer = async () => {
   // // 1. Connect to RabbitMQ
   // await connectRabbitMQ();
 
-  // // 2. Start all event consumers (LPR entry, sensor, LPR exit)
+  // // 2. Start all event consumers (OCR entry, OCR exit)
   // await startAllConsumers();
 
   // 3. Start HTTP Server

@@ -22,14 +22,11 @@ jest.mock('../../../src/repositories/sessionRepository.js', () => ({
   updateSessionExit: jest.fn(),
 }));
 
-jest.mock('../../../src/repositories/logRepository.js', () => ({
-  createLog: jest.fn(),
-}));
+jest.mock('../../../src/repositories/logRepository.js', () => ({}));
 
 import * as parkingService from '../../../src/services/parkingService.js';
 import * as slotRepo from '../../../src/repositories/slotRepository.js';
 import * as sessionRepo from '../../../src/repositories/sessionRepository.js';
-import * as logRepo from '../../../src/repositories/logRepository.js';
 
 const mockedGetAllSlots = slotRepo.getAllSlots as jest.MockedFunction<typeof slotRepo.getAllSlots>;
 const mockedGetAllLots = slotRepo.getAllLots as jest.MockedFunction<typeof slotRepo.getAllLots>;
@@ -39,7 +36,6 @@ const mockedUpdateSlotStatus = slotRepo.updateSlotStatus as jest.MockedFunction<
 const mockedFindActiveBySlot = sessionRepo.findActiveSessionBySlot as jest.MockedFunction<typeof sessionRepo.findActiveSessionBySlot>;
 const mockedFindActiveByPlate = sessionRepo.findActiveSessionByPlate as jest.MockedFunction<typeof sessionRepo.findActiveSessionByPlate>;
 const mockedFindSessionsByUserId = sessionRepo.findSessionsByUserId as jest.MockedFunction<typeof sessionRepo.findSessionsByUserId>;
-const mockedCreateLog = logRepo.createLog as jest.MockedFunction<typeof logRepo.createLog>;
 
 describe('parkingService', () => {
   beforeEach(() => {
@@ -93,7 +89,7 @@ describe('parkingService', () => {
     });
   });
 
-  describe('handleLprEntry', () => {
+  describe('handleOcrEntry', () => {
     it('should assign a free slot to registered vehicle with active card', async () => {
       const mockSlot = { slot_id: 'A1', status: 'FREE', is_active: true };
       const mockSession = { session_id: 'sess-1', slot_id: 'A1' };
@@ -108,16 +104,19 @@ describe('parkingService', () => {
           },
           parkingSlot: {
             findFirst: jest.fn().mockResolvedValue(mockSlot),
-            update: jest.fn().mockResolvedValue({ ...mockSlot, status: 'ASSIGNED' }),
+            update: jest.fn().mockResolvedValue({ ...mockSlot, status: 'OCCUPIED' }),
           },
           parkingSession: {
             create: jest.fn().mockResolvedValue(mockSession),
+          },
+          sensorLog: {
+            create: jest.fn().mockResolvedValue({}),
           },
         };
         return cb(tx);
       });
 
-      const result = await parkingService.handleLprEntry('1กข 1234', 'กรุงเทพมหานคร', 'lot-1');
+      const result = await parkingService.handleOcrEntry('1กข 1234', 'กรุงเทพมหานคร', 'lot-1');
 
       expect(result.session).toEqual(mockSession);
       expect(result.slot).toEqual(mockSlot);
@@ -143,11 +142,14 @@ describe('parkingService', () => {
           parkingSession: {
             create: jest.fn().mockResolvedValue(mockSession),
           },
+          sensorLog: {
+            create: jest.fn().mockResolvedValue({}),
+          },
         };
         return cb(tx);
       });
 
-      const result = await parkingService.handleLprEntry('1กข 1234', 'กรุงเทพมหานคร', 'lot-1');
+      const result = await parkingService.handleOcrEntry('1กข 1234', 'กรุงเทพมหานคร', 'lot-1');
 
       expect(result.session).toEqual(mockSession);
       expect(result.slot).toEqual(mockSlot);
@@ -168,7 +170,7 @@ describe('parkingService', () => {
         return cb(tx);
       });
 
-      const result = await parkingService.handleLprEntry('2ขค 5678', 'เชียงใหม่', 'lot-1');
+      const result = await parkingService.handleOcrEntry('2ขค 5678', 'เชียงใหม่', 'lot-1');
 
       expect(result.session).toEqual(mockSession);
       expect(result.slot).toBeNull();
@@ -192,7 +194,7 @@ describe('parkingService', () => {
         return cb(tx);
       });
 
-      const result = await parkingService.handleLprEntry('3คง 9999', 'ชลบุรี', 'lot-1');
+      const result = await parkingService.handleOcrEntry('3คง 9999', 'ชลบุรี', 'lot-1');
 
       expect(result.slot).toBeNull();
     });
@@ -214,11 +216,11 @@ describe('parkingService', () => {
       });
 
       await expect(
-        parkingService.handleLprEntry('9ZZ 9999', 'นครราชสีมา', 'lot-1')
+        parkingService.handleOcrEntry('9ZZ 9999', 'นครราชสีมา', 'lot-1')
       ).rejects.toThrow('No available parking slots.');
     });
 
-    it('should set slot status to ASSIGNED for registered vehicle', async () => {
+    it('should set slot status to OCCUPIED for registered vehicle', async () => {
       const mockUpdate = jest.fn().mockResolvedValue({});
       const mockSlot = { slot_id: 'A1', status: 'FREE', is_active: true };
 
@@ -237,15 +239,18 @@ describe('parkingService', () => {
           parkingSession: {
             create: jest.fn().mockResolvedValue({ session_id: 'sess-5' }),
           },
+          sensorLog: {
+            create: jest.fn().mockResolvedValue({}),
+          },
         };
         return cb(tx);
       });
 
-      await parkingService.handleLprEntry('1AB 1111', 'กรุงเทพมหานคร', 'lot-1');
+      await parkingService.handleOcrEntry('1AB 1111', 'กรุงเทพมหานคร', 'lot-1');
 
       expect(mockUpdate).toHaveBeenCalledWith({
         where: { slot_id: 'A1' },
-        data: { status: 'ASSIGNED' },
+        data: { status: 'OCCUPIED' },
       });
     });
 
@@ -265,11 +270,14 @@ describe('parkingService', () => {
             update: jest.fn().mockResolvedValue({}),
           },
           parkingSession: { create: mockCreate },
+          sensorLog: {
+            create: jest.fn().mockResolvedValue({}),
+          },
         };
         return cb(tx);
       });
 
-      await parkingService.handleLprEntry('1กข 1234', 'กรุงเทพมหานคร', 'lot-1');
+      await parkingService.handleOcrEntry('1กข 1234', 'กรุงเทพมหานคร', 'lot-1');
 
       expect(mockCreate).toHaveBeenCalledWith({
         data: expect.objectContaining({
@@ -293,7 +301,7 @@ describe('parkingService', () => {
         return cb(tx);
       });
 
-      await parkingService.handleLprEntry('2ขค 5678', 'เชียงใหม่', 'lot-1');
+      await parkingService.handleOcrEntry('2ขค 5678', 'เชียงใหม่', 'lot-1');
 
       expect(mockCreate).toHaveBeenCalledWith({
         data: expect.objectContaining({
@@ -306,69 +314,8 @@ describe('parkingService', () => {
     });
   });
 
-  describe('handleSlotOccupation', () => {
-    it('should transition slot from ASSIGNED to OCCUPIED', async () => {
-      mockedFindSlotById.mockResolvedValue({
-        slot_id: 'A1', status: 'ASSIGNED', is_active: true,
-        location_coordinates: '{}',
-      } as any);
-      mockedUpdateSlotStatus.mockResolvedValue({} as any);
-      mockedCreateLog.mockResolvedValue({} as any);
-      mockedFindActiveBySlot.mockResolvedValue({ session_id: 'sess-1' } as any);
-
-      const result = await parkingService.handleSlotOccupation('A1');
-
-      expect(mockedUpdateSlotStatus).toHaveBeenCalledWith('A1', 'OCCUPIED');
-      expect(mockedCreateLog).toHaveBeenCalledWith('A1', 'ENTRY', 'IR_TRIGGERED');
-    });
-
-    it('should pass raw data to sensor log', async () => {
-      mockedFindSlotById.mockResolvedValue({
-        slot_id: 'A1', status: 'ASSIGNED', is_active: true,
-        location_coordinates: '{}',
-      } as any);
-      mockedUpdateSlotStatus.mockResolvedValue({} as any);
-      mockedCreateLog.mockResolvedValue({} as any);
-      mockedFindActiveBySlot.mockResolvedValue({ session_id: 'sess-2' } as any);
-
-      await parkingService.handleSlotOccupation('A1', 'distance:5cm');
-
-      expect(mockedCreateLog).toHaveBeenCalledWith('A1', 'ENTRY', 'distance:5cm');
-    });
-
-    it('should throw error if slot not found', async () => {
-      mockedFindSlotById.mockResolvedValue(null);
-
-      await expect(
-        parkingService.handleSlotOccupation('NONEXISTENT')
-      ).rejects.toThrow('Slot NONEXISTENT not found.');
-    });
-
-    it('should throw error if slot is not in ASSIGNED state', async () => {
-      mockedFindSlotById.mockResolvedValue({
-        slot_id: 'A1', status: 'FREE', is_active: true,
-        location_coordinates: '{}',
-      } as any);
-
-      await expect(
-        parkingService.handleSlotOccupation('A1')
-      ).rejects.toThrow('Slot A1 is not in ASSIGNED state (current: FREE).');
-    });
-
-    it('should throw error if slot is already OCCUPIED', async () => {
-      mockedFindSlotById.mockResolvedValue({
-        slot_id: 'A1', status: 'OCCUPIED', is_active: true,
-        location_coordinates: '{}',
-      } as any);
-
-      await expect(
-        parkingService.handleSlotOccupation('A1')
-      ).rejects.toThrow('Slot A1 is not in ASSIGNED state (current: OCCUPIED).');
-    });
-  });
-
-  describe('handleSlotExit', () => {
-    it('should calculate fee for guest (no vehicle_id) and close session', async () => {
+  describe('handleOcrExit', () => {
+    it('should calculate fee and close session by license plate', async () => {
       mockPrisma.$transaction.mockImplementation(async (cb: Function) => {
         const tx = {
           parkingSession: {
@@ -377,6 +324,8 @@ describe('parkingService', () => {
               slot_id: 'GEN-A1',
               slot: { lot_id: 'lot-1' },
               vehicle_id: null,
+              registration: '2ขค 5678',
+              province: 'เชียงใหม่',
               entry_time: new Date('2026-03-30T10:00:00Z'),
             }),
             update: jest.fn().mockResolvedValue({}),
@@ -387,14 +336,11 @@ describe('parkingService', () => {
           sensorLog: {
             create: jest.fn().mockResolvedValue({}),
           },
-          registeredVehicle: {
-            findUnique: jest.fn(),
-          },
         };
         return cb(tx);
       });
 
-      const result = await parkingService.handleSlotExit('GEN-A1');
+      const result = await parkingService.handleOcrExit('2ขค 5678', 'เชียงใหม่', 'lot-1');
 
       expect(result.sessionId).toBe('sess-1');
       expect(result.slotId).toBe('GEN-A1');
@@ -412,6 +358,8 @@ describe('parkingService', () => {
               slot_id: 'VIP-A1',
               slot: { lot_id: 'lot-1' },
               vehicle_id: 'v-1',
+              registration: '1กข 1234',
+              province: 'กรุงเทพมหานคร',
               entry_time: entryTime,
             }),
             update: jest.fn().mockResolvedValue({}),
@@ -426,7 +374,7 @@ describe('parkingService', () => {
         return cb(tx);
       });
 
-      const result = await parkingService.handleSlotExit('VIP-A1');
+      const result = await parkingService.handleOcrExit('1กข 1234', 'กรุงเทพมหานคร', 'lot-1');
 
       expect(result.totalFee).toBeGreaterThanOrEqual(0);
     });
@@ -442,8 +390,8 @@ describe('parkingService', () => {
       });
 
       await expect(
-        parkingService.handleSlotExit('GEN-Z9')
-      ).rejects.toThrow('No active parking session found for slot GEN-Z9.');
+        parkingService.handleOcrExit('9ZZ 0000', 'ชลบุรี', 'lot-1')
+      ).rejects.toThrow('No active parking session found for 9ZZ 0000 (ชลบุรี).');
     });
 
     it('should free the slot back to FREE status', async () => {
@@ -457,6 +405,8 @@ describe('parkingService', () => {
               slot_id: 'GEN-B1',
               slot: { lot_id: 'lot-1' },
               vehicle_id: null,
+              registration: '3คง 9999',
+              province: 'ชลบุรี',
               entry_time: new Date('2026-03-30T10:00:00Z'),
             }),
             update: jest.fn().mockResolvedValue({}),
@@ -471,7 +421,7 @@ describe('parkingService', () => {
         return cb(tx);
       });
 
-      await parkingService.handleSlotExit('GEN-B1');
+      await parkingService.handleOcrExit('3คง 9999', 'ชลบุรี', 'lot-1');
 
       expect(mockSlotUpdate).toHaveBeenCalledWith({
         where: { slot_id: 'GEN-B1' },
@@ -479,35 +429,7 @@ describe('parkingService', () => {
       });
     });
 
-    it('should set 0 fee for very short guest sessions', async () => {
-      mockPrisma.$transaction.mockImplementation(async (cb: Function) => {
-        const tx = {
-          parkingSession: {
-            findFirst: jest.fn().mockResolvedValue({
-              session_id: 'sess-4',
-              slot_id: 'GEN-A1',
-              slot: { lot_id: 'lot-1' },
-              vehicle_id: null,
-              entry_time: new Date('2026-03-30T10:00:00Z'),
-            }),
-            update: jest.fn().mockResolvedValue({}),
-          },
-          parkingSlot: {
-            update: jest.fn().mockResolvedValue({}),
-          },
-          sensorLog: {
-            create: jest.fn().mockResolvedValue({}),
-          },
-        };
-        return cb(tx);
-      });
-
-      const result = await parkingService.handleSlotExit('GEN-A1');
-
-      expect(result.totalFee).toBeGreaterThanOrEqual(0);
-    });
-
-    it('should pass raw data to exit sensor log', async () => {
+    it('should log OCR exit event in sensor log', async () => {
       const mockLogCreate = jest.fn().mockResolvedValue({});
 
       mockPrisma.$transaction.mockImplementation(async (cb: Function) => {
@@ -518,6 +440,8 @@ describe('parkingService', () => {
               slot_id: 'GEN-A1',
               slot: { lot_id: 'lot-1' },
               vehicle_id: null,
+              registration: '2ขค 5678',
+              province: 'เชียงใหม่',
               entry_time: new Date('2026-03-30T10:00:00Z'),
             }),
             update: jest.fn().mockResolvedValue({}),
@@ -532,12 +456,12 @@ describe('parkingService', () => {
         return cb(tx);
       });
 
-      await parkingService.handleSlotExit('GEN-A1', 'distance:>30cm');
+      await parkingService.handleOcrExit('2ขค 5678', 'เชียงใหม่', 'lot-1');
 
       expect(mockLogCreate).toHaveBeenCalledWith({
         data: expect.objectContaining({
           event_type: 'EXIT',
-          raw_data: 'distance:>30cm',
+          raw_data: 'OCR_EXIT: 2ขค 5678 เชียงใหม่',
         }),
       });
     });
