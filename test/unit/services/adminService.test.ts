@@ -1,4 +1,5 @@
 jest.mock('../../../src/repositories/adminRepository.js', () => ({
+  createLotWithSlots: jest.fn(),
   getAllSessions: jest.fn(),
   getAllSensorLogs: jest.fn(),
 }));
@@ -11,6 +12,24 @@ const mockAdminRepo = adminRepository as jest.Mocked<typeof adminRepository>;
 describe('adminService', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+  });
+
+  describe('createLotWithSlots', () => {
+    it('should delegate to repository', async () => {
+      const input = {
+        name: 'Test Lot',
+        mall_id: 'mall-1',
+        program_id: 'prog-1',
+        slots: [{ slot_id: 'A1', location_coordinates: '{}', rotation: 0 }],
+      };
+      const mockResult = { lot_id: 'lot-1', ...input };
+      mockAdminRepo.createLotWithSlots.mockResolvedValue(mockResult as any);
+
+      const result = await adminService.createLotWithSlots(input);
+
+      expect(result).toEqual(mockResult);
+      expect(mockAdminRepo.createLotWithSlots).toHaveBeenCalledWith(input);
+    });
   });
 
   describe('getSessions', () => {

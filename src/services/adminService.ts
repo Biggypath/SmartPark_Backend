@@ -1,4 +1,9 @@
 import * as adminRepo from '../repositories/adminRepository.js';
+import type { CreateLotInput } from '../repositories/adminRepository.js';
+
+export const createLotWithSlots = async (input: CreateLotInput) => {
+  return adminRepo.createLotWithSlots(input);
+};
 
 export const getSessions = async (filters?: {
   status?: 'active' | 'completed';

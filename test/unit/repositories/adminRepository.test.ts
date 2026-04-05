@@ -1,4 +1,11 @@
+const mockTx = {
+  privilegeParking: {
+    create: jest.fn(),
+  },
+};
+
 const mockPrisma = {
+  $transaction: jest.fn((fn: (tx: typeof mockTx) => Promise<unknown>) => fn(mockTx)),
   parkingSession: {
     findMany: jest.fn(),
   },
@@ -16,6 +23,70 @@ import * as adminRepo from '../../../src/repositories/adminRepository.js';
 describe('adminRepository', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+  });
+
+  describe('createLotWithSlots', () => {
+    it('should create lot with slots and pricing rule in a transaction', async () => {
+      const input = {
+        name: 'Test Lot',
+        mall_id: 'mall-1',
+        program_id: 'prog-1',
+        location: 'Bangkok',
+        rate_per_hour: 25,
+        slots: [
+          { slot_id: 'A1', location_coordinates: '{"x":0}', rotation: 0 },
+          { slot_id: 'A2', location_coordinates: '{"x":10}', rotation: 90 },
+        ],
+      };
+      const mockResult = { lot_id: 'lot-1', name: 'Test Lot' };
+      mockTx.privilegeParking.create.mockResolvedValue(mockResult);
+
+      const result = await adminRepo.createLotWithSlots(input);
+
+      expect(result).toEqual(mockResult);
+      expect(mockPrisma.$transaction).toHaveBeenCalled();
+      expect(mockTx.privilegeParking.create).toHaveBeenCalledWith({
+        data: {
+          name: 'Test Lot',
+          mall_id: 'mall-1',
+          program_id: 'prog-1',
+          location: 'Bangkok',
+          pricingRule: { create: { rate_per_hour: 25 } },
+          slots: {
+            create: [
+              { slot_id: 'A1', location_coordinates: '{"x":0}', rotation: 0 },
+              { slot_id: 'A2', location_coordinates: '{"x":10}', rotation: 90 },
+            ],
+          },
+        },
+        include: {
+          slots: true,
+          pricingRule: true,
+          mall: true,
+          program: true,
+        },
+      });
+    });
+
+    it('should use default rate_per_hour when not provided', async () => {
+      const input = {
+        name: 'Lot',
+        mall_id: 'mall-1',
+        program_id: 'prog-1',
+        slots: [{ slot_id: 'B1', location_coordinates: '{}', rotation: 0 }],
+      };
+      mockTx.privilegeParking.create.mockResolvedValue({});
+
+      await adminRepo.createLotWithSlots(input);
+
+      expect(mockTx.privilegeParking.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            pricingRule: { create: { rate_per_hour: 20.0 } },
+          }),
+        })
+      );
+    });
   });
 
   describe('getAllSessions', () => {

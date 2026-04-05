@@ -8,6 +8,9 @@ const router = Router();
 router.use(authMiddleware);
 router.use(adminMiddleware);
 
+// Create a new parking lot with slots
+router.post('/lots', adminController.createLot);
+
 // View all parking sessions (with optional filters)
 router.get('/sessions', adminController.getSessions);
 

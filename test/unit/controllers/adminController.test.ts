@@ -1,4 +1,5 @@
 jest.mock('../../../src/services/adminService.js', () => ({
+  createLotWithSlots: jest.fn(),
   getSessions: jest.fn(),
   getSensorLogs: jest.fn(),
 }));
@@ -20,6 +21,80 @@ const mockRes = () => {
 describe('adminController', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+  });
+
+  describe('createLot', () => {
+    const validBody = {
+      name: 'Test Lot',
+      mall_id: 'mall-1',
+      program_id: 'prog-1',
+      location: 'Bangkok',
+      rate_per_hour: 25,
+      slots: [
+        { slot_id: 'A1', location_coordinates: '{"x":0,"y":0,"z":0}', rotation: 0 },
+        { slot_id: 'A2', location_coordinates: '{"x":10,"y":0,"z":0}', rotation: 90 },
+      ],
+    };
+
+    it('should return 201 with created lot', async () => {
+      const created = { lot_id: 'lot-1', ...validBody };
+      mockAdminService.createLotWithSlots.mockResolvedValue(created as any);
+
+      const req = { body: validBody } as AuthRequest;
+      const res = mockRes();
+
+      await adminController.createLot(req, res);
+
+      expect(mockAdminService.createLotWithSlots).toHaveBeenCalledWith({
+        name: 'Test Lot',
+        mall_id: 'mall-1',
+        program_id: 'prog-1',
+        location: 'Bangkok',
+        rate_per_hour: 25,
+        slots: validBody.slots,
+      });
+      expect(res.status).toHaveBeenCalledWith(201);
+      expect(res.json).toHaveBeenCalledWith(created);
+    });
+
+    it('should return 400 if name is missing', async () => {
+      const req = { body: { mall_id: 'mall-1', program_id: 'prog-1', slots: [{ slot_id: 'A1', location_coordinates: '{}', rotation: 0 }] } } as AuthRequest;
+      const res = mockRes();
+
+      await adminController.createLot(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(400);
+    });
+
+    it('should return 400 if slots is empty', async () => {
+      const req = { body: { name: 'Lot', mall_id: 'mall-1', program_id: 'prog-1', slots: [] } } as AuthRequest;
+      const res = mockRes();
+
+      await adminController.createLot(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(400);
+    });
+
+    it('should return 400 if a slot is missing required fields', async () => {
+      const req = { body: { name: 'Lot', mall_id: 'mall-1', program_id: 'prog-1', slots: [{ slot_id: 'A1' }] } } as AuthRequest;
+      const res = mockRes();
+
+      await adminController.createLot(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(400);
+    });
+
+    it('should return 500 on service error', async () => {
+      mockAdminService.createLotWithSlots.mockRejectedValue(new Error('Duplicate name'));
+
+      const req = { body: validBody } as AuthRequest;
+      const res = mockRes();
+
+      await adminController.createLot(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(500);
+      expect(res.json).toHaveBeenCalledWith({ error: 'Duplicate name' });
+    });
   });
 
   describe('getSessions', () => {

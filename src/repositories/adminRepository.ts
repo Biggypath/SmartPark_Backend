@@ -1,5 +1,48 @@
 import { prisma } from '../config/db.js';
 
+export interface CreateLotInput {
+  name: string;
+  mall_id: string;
+  program_id: string;
+  location?: string;
+  rate_per_hour?: number;
+  slots: {
+    slot_id: string;
+    location_coordinates: string;
+    rotation: number;
+  }[];
+}
+
+export const createLotWithSlots = async (input: CreateLotInput) => {
+  return prisma.$transaction(async (tx) => {
+    const lot = await tx.privilegeParking.create({
+      data: {
+        name: input.name,
+        mall_id: input.mall_id,
+        program_id: input.program_id,
+        location: input.location ?? null,
+        pricingRule: {
+          create: { rate_per_hour: input.rate_per_hour ?? 20.0 },
+        },
+        slots: {
+          create: input.slots.map((s) => ({
+            slot_id: s.slot_id,
+            location_coordinates: s.location_coordinates,
+            rotation: s.rotation,
+          })),
+        },
+      },
+      include: {
+        slots: true,
+        pricingRule: true,
+        mall: true,
+        program: true,
+      },
+    });
+    return lot;
+  });
+};
+
 export const getAllSessions = async (filters?: {
   status?: 'active' | 'completed';
   registration?: string;
