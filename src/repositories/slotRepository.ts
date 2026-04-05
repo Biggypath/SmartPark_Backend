@@ -42,3 +42,10 @@ export const updateSlotStatus = async (slotId: string, status: SlotStatus) => {
     data: { status }
   });
 };
+
+export const getRoadsByLotId = async (lotId: string) => {
+  return prisma.road.findMany({
+    where: { lot_id: lotId },
+    orderBy: { road_id: 'asc' },
+  });
+};

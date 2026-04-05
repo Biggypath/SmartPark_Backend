@@ -38,6 +38,13 @@ export const getDashboardByLot = async (lotId: string) => {
 };
 
 /**
+ * Returns all road segments for a specific parking lot.
+ */
+export const getRoadsByLot = async (lotId: string) => {
+  return await slotRepo.getRoadsByLotId(lotId);
+};
+
+/**
  * Returns all slots for the 3D Digital Twin dashboard.
  */
 export const getDashboardData = async () => {

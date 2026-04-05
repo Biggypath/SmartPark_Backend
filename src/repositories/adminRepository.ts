@@ -11,6 +11,14 @@ export interface CreateLotInput {
     location_coordinates: string;
     rotation: number;
   }[];
+  roads?: {
+    cx: number;
+    cy: number;
+    w: number;
+    d: number;
+    horizontal: boolean;
+    connections?: Record<string, boolean> | null;
+  }[];
 }
 
 export const createLotWithSlots = async (input: CreateLotInput) => {
@@ -31,9 +39,24 @@ export const createLotWithSlots = async (input: CreateLotInput) => {
             rotation: s.rotation,
           })),
         },
+        ...(input.roads?.length
+          ? {
+              roads: {
+                create: input.roads.map((r) => ({
+                  cx: r.cx,
+                  cy: r.cy,
+                  w: r.w,
+                  d: r.d,
+                  horizontal: r.horizontal,
+                  ...(r.connections != null ? { connections: r.connections } : {}),
+                })),
+              },
+            }
+          : {}),
       },
       include: {
         slots: true,
+        roads: true,
         pricingRule: true,
         mall: true,
         program: true,
@@ -135,6 +158,7 @@ export const deleteMall = async (mallId: string) => {
         await tx.parkingSlot.deleteMany({ where: { slot_id: { in: slotIds } } });
       }
 
+      await tx.road.deleteMany({ where: { lot_id: { in: lotIds } } });
       await tx.pricingRule.deleteMany({ where: { parkinglot_id: { in: lotIds } } });
       await tx.privilegeParking.deleteMany({ where: { lot_id: { in: lotIds } } });
     }
@@ -177,6 +201,7 @@ export const deleteLot = async (lotId: string) => {
       await tx.parkingSlot.deleteMany({ where: { lot_id: lotId } });
     }
 
+    await tx.road.deleteMany({ where: { lot_id: lotId } });
     await tx.pricingRule.deleteMany({ where: { parkinglot_id: lotId } });
     return tx.privilegeParking.delete({ where: { lot_id: lotId } });
   });

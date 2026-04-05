@@ -9,6 +9,9 @@ router.get('/lots', parkingController.getLots);
 // Public: get slots for a specific lot (3D Digital Twin per-lot dashboard)
 router.get('/lots/:lotId/slots', parkingController.getLotDashboard);
 
+// Public: get road segments for a specific lot
+router.get('/lots/:lotId/roads', parkingController.getLotRoads);
+
 // Public: get all slot statuses for the 3D Digital Twin dashboard
 router.get('/dashboard', parkingController.getDashboard);
 

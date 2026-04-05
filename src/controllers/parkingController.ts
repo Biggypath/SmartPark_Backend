@@ -69,3 +69,14 @@ export const getParkingHistory = async (req: AuthRequest, res: Response) => {
     res.status(500).json({ error: message });
   }
 };
+
+export const getLotRoads = async (req: Request<{ lotId: string }>, res: Response) => {
+  try {
+    const { lotId } = req.params;
+    const roads = await parkingService.getRoadsByLot(lotId);
+    res.status(200).json(roads);
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Failed to fetch lot roads.';
+    res.status(500).json({ error: message });
+  }
+};

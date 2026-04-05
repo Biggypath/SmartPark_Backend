@@ -4,7 +4,7 @@ import * as adminService from '../services/adminService.js';
 
 export const createLot = async (req: AuthRequest, res: Response) => {
   try {
-    const { name, mall_id, program_id, location, rate_per_hour, slots } = req.body;
+    const { name, mall_id, program_id, location, rate_per_hour, slots, roads } = req.body;
 
     if (!name || !mall_id || !program_id || !Array.isArray(slots) || slots.length === 0) {
       res.status(400).json({ error: 'name, mall_id, program_id, and a non-empty slots array are required.' });
@@ -18,6 +18,15 @@ export const createLot = async (req: AuthRequest, res: Response) => {
       }
     }
 
+    if (roads && Array.isArray(roads)) {
+      for (const road of roads) {
+        if (road.cx === undefined || road.cy === undefined || road.w === undefined || road.d === undefined || road.horizontal === undefined) {
+          res.status(400).json({ error: 'Each road must have cx, cy, w, d, and horizontal.' });
+          return;
+        }
+      }
+    }
+
     const lot = await adminService.createLotWithSlots({
       name,
       mall_id,
@@ -25,6 +34,7 @@ export const createLot = async (req: AuthRequest, res: Response) => {
       location,
       rate_per_hour,
       slots,
+      ...(Array.isArray(roads) ? { roads } : {}),
     });
 
     res.status(201).json(lot);
