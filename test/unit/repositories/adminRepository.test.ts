@@ -1,11 +1,46 @@
 const mockTx = {
   privilegeParking: {
     create: jest.fn(),
+    findMany: jest.fn(),
+    delete: jest.fn(),
+    deleteMany: jest.fn(),
+  },
+  parkingSlot: {
+    findMany: jest.fn(),
+    delete: jest.fn(),
+    deleteMany: jest.fn(),
+  },
+  parkingSession: {
+    deleteMany: jest.fn(),
+  },
+  sensorLog: {
+    deleteMany: jest.fn(),
+  },
+  pricingRule: {
+    deleteMany: jest.fn(),
+  },
+  mall: {
+    delete: jest.fn(),
   },
 };
 
 const mockPrisma = {
   $transaction: jest.fn((fn: (tx: typeof mockTx) => Promise<unknown>) => fn(mockTx)),
+  mall: {
+    findMany: jest.fn(),
+    create: jest.fn(),
+    update: jest.fn(),
+  },
+  privilegeProgram: {
+    findMany: jest.fn(),
+  },
+  privilegeParking: {
+    update: jest.fn(),
+  },
+  parkingSlot: {
+    findUniqueOrThrow: jest.fn(),
+    update: jest.fn(),
+  },
   parkingSession: {
     findMany: jest.fn(),
   },
@@ -205,6 +240,129 @@ describe('adminRepository', () => {
           where: { slot_id: 'VIP-A1', event_type: 'EXIT' },
         })
       );
+    });
+  });
+
+  describe('getAllMalls', () => {
+    it('should return all malls', async () => {
+      const malls = [{ mall_id: 'm1', name: 'Mall A' }];
+      mockPrisma.mall.findMany.mockResolvedValue(malls);
+
+      const result = await adminRepo.getAllMalls();
+
+      expect(result).toEqual(malls);
+      expect(mockPrisma.mall.findMany).toHaveBeenCalledWith({
+        include: { lots: true },
+        orderBy: { name: 'asc' },
+      });
+    });
+  });
+
+  describe('createMall', () => {
+    it('should create a mall', async () => {
+      const mall = { mall_id: 'm1', name: 'New Mall' };
+      mockPrisma.mall.create.mockResolvedValue(mall);
+
+      const result = await adminRepo.createMall('New Mall');
+
+      expect(result).toEqual(mall);
+      expect(mockPrisma.mall.create).toHaveBeenCalledWith({ data: { name: 'New Mall' } });
+    });
+  });
+
+  describe('updateMall', () => {
+    it('should update a mall name', async () => {
+      const mall = { mall_id: 'm1', name: 'Updated' };
+      mockPrisma.mall.update.mockResolvedValue(mall);
+
+      const result = await adminRepo.updateMall('m1', 'Updated');
+
+      expect(result).toEqual(mall);
+      expect(mockPrisma.mall.update).toHaveBeenCalledWith({ where: { mall_id: 'm1' }, data: { name: 'Updated' } });
+    });
+  });
+
+  describe('deleteMall', () => {
+    it('should cascade-delete lots, slots, sessions, logs, pricing rules', async () => {
+      mockTx.privilegeParking.findMany.mockResolvedValue([{ lot_id: 'lot-1' }]);
+      mockTx.parkingSlot.findMany.mockResolvedValue([{ slot_id: 'A1' }]);
+      mockTx.parkingSession.deleteMany.mockResolvedValue({ count: 1 });
+      mockTx.sensorLog.deleteMany.mockResolvedValue({ count: 1 });
+      mockTx.parkingSlot.deleteMany.mockResolvedValue({ count: 1 });
+      mockTx.pricingRule.deleteMany.mockResolvedValue({ count: 1 });
+      mockTx.privilegeParking.deleteMany.mockResolvedValue({ count: 1 });
+      mockTx.mall.delete.mockResolvedValue({ mall_id: 'm1' });
+
+      await adminRepo.deleteMall('m1');
+
+      expect(mockPrisma.$transaction).toHaveBeenCalled();
+      expect(mockTx.mall.delete).toHaveBeenCalledWith({ where: { mall_id: 'm1' } });
+    });
+  });
+
+  describe('getAllPrograms', () => {
+    it('should return all programs', async () => {
+      const programs = [{ program_id: 'p1' }];
+      mockPrisma.privilegeProgram.findMany.mockResolvedValue(programs);
+
+      const result = await adminRepo.getAllPrograms();
+
+      expect(result).toEqual(programs);
+    });
+  });
+
+  describe('updateLot', () => {
+    it('should update lot data', async () => {
+      const lot = { lot_id: 'lot-1', name: 'New Name' };
+      mockPrisma.privilegeParking.update.mockResolvedValue(lot);
+
+      const result = await adminRepo.updateLot('lot-1', { name: 'New Name' });
+
+      expect(result).toEqual(lot);
+    });
+  });
+
+  describe('deleteLot', () => {
+    it('should cascade-delete slots, sessions, logs, pricing rules', async () => {
+      mockTx.parkingSlot.findMany.mockResolvedValue([{ slot_id: 'A1' }]);
+      mockTx.parkingSession.deleteMany.mockResolvedValue({ count: 1 });
+      mockTx.sensorLog.deleteMany.mockResolvedValue({ count: 1 });
+      mockTx.parkingSlot.deleteMany.mockResolvedValue({ count: 1 });
+      mockTx.pricingRule.deleteMany.mockResolvedValue({ count: 1 });
+      mockTx.privilegeParking.delete.mockResolvedValue({ lot_id: 'lot-1' });
+
+      await adminRepo.deleteLot('lot-1');
+
+      expect(mockPrisma.$transaction).toHaveBeenCalled();
+      expect(mockTx.privilegeParking.delete).toHaveBeenCalledWith({ where: { lot_id: 'lot-1' } });
+    });
+  });
+
+  describe('toggleSlotActive', () => {
+    it('should toggle is_active from true to false', async () => {
+      mockPrisma.parkingSlot.findUniqueOrThrow.mockResolvedValue({ slot_id: 'A1', is_active: true });
+      mockPrisma.parkingSlot.update.mockResolvedValue({ slot_id: 'A1', is_active: false });
+
+      const result = await adminRepo.toggleSlotActive('A1');
+
+      expect(result).toEqual({ slot_id: 'A1', is_active: false });
+      expect(mockPrisma.parkingSlot.update).toHaveBeenCalledWith({
+        where: { slot_id: 'A1' },
+        data: { is_active: false },
+      });
+    });
+  });
+
+  describe('deleteSlot', () => {
+    it('should cascade-delete sessions, logs, then slot', async () => {
+      mockTx.parkingSession.deleteMany.mockResolvedValue({ count: 0 });
+      mockTx.sensorLog.deleteMany.mockResolvedValue({ count: 0 });
+      mockTx.parkingSlot.delete.mockResolvedValue({ slot_id: 'A1' });
+
+      await adminRepo.deleteSlot('A1');
+
+      expect(mockPrisma.$transaction).toHaveBeenCalled();
+      expect(mockTx.parkingSlot.delete).toHaveBeenCalledWith({ where: { slot_id: 'A1' } });
     });
   });
 });

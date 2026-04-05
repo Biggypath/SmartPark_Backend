@@ -61,3 +61,133 @@ export const getSensorLogs = async (req: AuthRequest, res: Response) => {
     res.status(500).json({ error: message });
   }
 };
+
+// ---------------------------------------------------------
+// Mall endpoints
+// ---------------------------------------------------------
+
+export const getMalls = async (_req: AuthRequest, res: Response) => {
+  try {
+    const malls = await adminService.getAllMalls();
+    res.status(200).json(malls);
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Failed to fetch malls.';
+    res.status(500).json({ error: message });
+  }
+};
+
+export const createMall = async (req: AuthRequest, res: Response) => {
+  try {
+    const { name } = req.body;
+    if (!name || typeof name !== 'string') {
+      res.status(400).json({ error: 'name is required.' });
+      return;
+    }
+    const mall = await adminService.createMall(name);
+    res.status(201).json(mall);
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Failed to create mall.';
+    res.status(500).json({ error: message });
+  }
+};
+
+export const updateMall = async (req: AuthRequest, res: Response) => {
+  try {
+    const mall_id = req.params.mall_id as string;
+    const { name } = req.body;
+    if (!name || typeof name !== 'string') {
+      res.status(400).json({ error: 'name is required.' });
+      return;
+    }
+    const mall = await adminService.updateMall(mall_id, name);
+    res.status(200).json(mall);
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Failed to update mall.';
+    res.status(500).json({ error: message });
+  }
+};
+
+export const deleteMall = async (req: AuthRequest, res: Response) => {
+  try {
+    const mall_id = req.params.mall_id as string;
+    await adminService.deleteMall(mall_id);
+    res.status(204).send();
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Failed to delete mall.';
+    res.status(500).json({ error: message });
+  }
+};
+
+// ---------------------------------------------------------
+// Programs endpoint
+// ---------------------------------------------------------
+
+export const getPrograms = async (_req: AuthRequest, res: Response) => {
+  try {
+    const programs = await adminService.getAllPrograms();
+    res.status(200).json(programs);
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Failed to fetch programs.';
+    res.status(500).json({ error: message });
+  }
+};
+
+// ---------------------------------------------------------
+// Lot management endpoints
+// ---------------------------------------------------------
+
+export const updateLot = async (req: AuthRequest, res: Response) => {
+  try {
+    const lot_id = req.params.lot_id as string;
+    const { name, program_id } = req.body;
+    if (!name && !program_id) {
+      res.status(400).json({ error: 'At least one of name or program_id is required.' });
+      return;
+    }
+    const data: { name?: string; program_id?: string } = {};
+    if (name) data.name = name;
+    if (program_id) data.program_id = program_id;
+    const lot = await adminService.updateLot(lot_id, data);
+    res.status(200).json(lot);
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Failed to update lot.';
+    res.status(500).json({ error: message });
+  }
+};
+
+export const deleteLot = async (req: AuthRequest, res: Response) => {
+  try {
+    const lot_id = req.params.lot_id as string;
+    await adminService.deleteLot(lot_id);
+    res.status(204).send();
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Failed to delete lot.';
+    res.status(500).json({ error: message });
+  }
+};
+
+// ---------------------------------------------------------
+// Slot management endpoints
+// ---------------------------------------------------------
+
+export const toggleSlotActive = async (req: AuthRequest, res: Response) => {
+  try {
+    const slot_id = req.params.slot_id as string;
+    const slot = await adminService.toggleSlotActive(slot_id);
+    res.status(200).json(slot);
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Failed to toggle slot.';
+    res.status(500).json({ error: message });
+  }
+};
+
+export const deleteSlot = async (req: AuthRequest, res: Response) => {
+  try {
+    const slot_id = req.params.slot_id as string;
+    await adminService.deleteSlot(slot_id);
+    res.status(204).send();
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Failed to delete slot.';
+    res.status(500).json({ error: message });
+  }
+};
