@@ -170,6 +170,7 @@ model ParkingSlot {
   lot_id               String
   status               SlotStatus @default(FREE)
   location_coordinates String     // Stores JSON string "{x:10, y:0, z:5}" for Three.js
+  rotation             Float      // Rotation in degrees for Three.js visualization
   is_active            Boolean    @default(true) // Hardware availability
 
   // Relations

@@ -240,6 +240,7 @@ async function main() {
             lot_id: lot.lot_id,
             status: "FREE",
             location_coordinates: JSON.stringify({ x: col * 10, y: lotIdx * 10, z: 0 }),
+            rotation: 0,
             is_active: true,
           },
         })
