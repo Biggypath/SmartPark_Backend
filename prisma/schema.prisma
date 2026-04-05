@@ -160,9 +160,25 @@ model PrivilegeParking {
   mall    Mall             @relation(fields: [mall_id], references: [mall_id])
   program PrivilegeProgram @relation(fields: [program_id], references: [program_id])
   slots   ParkingSlot[]
+  roads   Road[]
   pricingRule PricingRule?
 
   @@map("parking_lots")
+}
+
+model Road {
+  road_id     String  @id @default(uuid())
+  lot_id      String
+  cx          Float   // Center X in world coordinates
+  cy          Float   // Center Y in world coordinates
+  w           Float   // Width of the road patch
+  d           Float   // Depth of the road patch
+  horizontal  Boolean // Orientation flag
+  connections Json?   // { top, bottom, left, right } or null
+
+  lot PrivilegeParking @relation(fields: [lot_id], references: [lot_id])
+
+  @@map("roads")
 }
 
 model ParkingSlot {

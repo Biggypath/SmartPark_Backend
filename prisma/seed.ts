@@ -1,5 +1,5 @@
 import "dotenv/config";
-import { PrismaClient } from "@prisma/client";
+import { Prisma, PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import bcrypt from "bcrypt";
 
@@ -13,6 +13,7 @@ async function main() {
   await prisma.parkingSession.deleteMany({});
   await prisma.sensorLog.deleteMany({});
   await prisma.parkingSlot.deleteMany({});
+  await prisma.road.deleteMany({});
   await prisma.pricingRule.deleteMany({});
   await prisma.privilegeParking.deleteMany({});
   await prisma.mall.deleteMany({});
@@ -250,6 +251,31 @@ async function main() {
 
   const parkingSlots = await Promise.all(slotPromises);
   console.log(`Created ${parkingSlots.length} parking slots`);
+
+  // Roads (road patches for each lot)
+  const roadPromises = [];
+  for (const lot of lots) {
+    // Horizontal road running across the lot
+    roadPromises.push(
+      prisma.road.create({
+        data: { lot_id: lot.lot_id, cx: 20, cy: 0, w: 60, d: 8, horizontal: true, connections: Prisma.JsonNull },
+      })
+    );
+    // Vertical road on the left side
+    roadPromises.push(
+      prisma.road.create({
+        data: { lot_id: lot.lot_id, cx: -5, cy: 0, w: 8, d: 40, horizontal: false, connections: Prisma.JsonNull },
+      })
+    );
+    // Intersection patch where roads cross
+    roadPromises.push(
+      prisma.road.create({
+        data: { lot_id: lot.lot_id, cx: -5, cy: 0, w: 8, d: 8, horizontal: true, connections: { top: true, bottom: true, left: true, right: true } },
+      })
+    );
+  }
+  const roads = await Promise.all(roadPromises);
+  console.log(`Created ${roads.length} road segments`);
 
   // Sensor Logs (5 entries for the first lot's slots)
   const logPromises = parkingSlots.slice(0, 5).map((slot) =>
