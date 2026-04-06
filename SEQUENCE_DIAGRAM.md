@@ -69,7 +69,7 @@ sequenceDiagram
     OCR->>OCR: Run Thai license plate OCR
     OCR->>OCR: Deduplicate
     OCR->>RMQ: Publish result<br/>queue: ocr.exit.events<br/>{registration, province, lotId, camId}
-    deactivate OCR
+    deactivate OCR  
 
     activate Backend
     RMQ-->>Backend: Consume from ocr.exit.events
@@ -95,4 +95,116 @@ sequenceDiagram
     Barrier->>Barrier: Activate relay → lower exit barrier
     deactivate Barrier
     Note over Car, Barrier: Car exits the parking lot
+```
+
+---
+
+# Card Registration Flow — Sequence Diagram
+
+> 3-step wizard at `/edit/add-card`
+
+```mermaid
+sequenceDiagram
+    participant User as User (Browser)
+    participant FE as React Frontend
+    participant BE as SmartPark Backend
+    participant DB as PostgreSQL (Prisma)
+
+    %% ── STEP 1 — Card Details ─────────────────────────────
+
+    Note over User, FE: Step 1 — Enter Card Details
+
+    User->>FE: Navigate to /edit/add-card
+    FE->>FE: Render card form<br/>(card number, cardholder name,<br/>expiry month/year, label)
+    User->>FE: Fill in 16-digit card number,<br/>cardholder name, expiry, label
+    User->>FE: Click "Next"
+
+    FE->>FE: detectIssuer(cardNumber)<br/>→ Identifies network (VISA, MASTERCARD, etc.)
+
+    FE->>BE: GET /api/parking/lots
+    activate BE
+    BE->>DB: Query ParkingLot + PrivilegeProgram<br/>(with eligible_bins)
+    DB-->>BE: Parking lots with program details
+    BE-->>FE: 200 OK — List of parking lots
+    deactivate BE
+
+    FE->>FE: Filter lots whose program<br/>eligible_bins match card BIN
+
+    %% ── STEP 2 — Privileges Preview ──────────────────────
+
+    Note over User, FE: Step 2 — Privileges Preview
+
+    FE->>User: Display detected issuer (e.g., VISA)<br/>and qualifying parking lots
+    Note right of FE: Informational only —<br/>no API calls
+
+    User->>FE: Click "Next"
+
+    %% ── STEP 3 — Vehicle Registration ────────────────────
+
+    Note over User, FE: Step 3 — Register Vehicle
+
+    FE->>FE: Render vehicle form<br/>(license plate, province,<br/>brand, model, color)
+    User->>FE: Fill in vehicle details
+    User->>FE: Click "Save Card"
+
+    %% ── API Call 1: Create Card ──────────────────────────
+
+    FE->>BE: POST /api/users/cards<br/>Authorization: Bearer <token><br/>{ card_number, expiry_month, expiry_year,<br/>  cardholder_name, label }
+    activate BE
+    BE->>BE: Validate card_number,<br/>expiry_month, expiry_year required
+    BE->>BE: Extract BIN (first 6 digits),<br/>last four, detect network
+    BE->>DB: Query PrivilegeProgram<br/>where eligible_bins contains BIN
+    DB-->>BE: Matching program (or none)
+
+    alt No matching program
+        BE-->>FE: 400 — "No privilege program found for this card."
+        FE->>User: Show error message
+    else Program found
+        BE->>DB: INSERT UserCard<br/>(user_id, program_id, network,<br/>bin, last_four, expiry_month,<br/>expiry_year, cardholder_name, label)
+        DB-->>BE: Created card record
+        BE-->>FE: 201 Created — { card_id, program, ... }
+    end
+    deactivate BE
+
+    %% ── API Call 2: Register Vehicle ─────────────────────
+
+    FE->>BE: POST /api/users/vehicles<br/>Authorization: Bearer <token><br/>{ registration, province, brand,<br/>  model, color, card_id }
+    activate BE
+    BE->>BE: Validate registration,<br/>province, card_id required
+    BE->>DB: Query UserCard by card_id
+    DB-->>BE: Card record
+
+    alt Card not found
+        BE-->>FE: 404 — "Card not found."
+        FE->>User: Show error message
+    else Card not owned by user
+        BE-->>FE: 403 — "You do not own this card."
+        FE->>User: Show error message
+    else Valid card
+        BE->>DB: UPSERT RegisteredVehicle<br/>(registration, province, brand,<br/>model, color) + link to card_id
+        DB-->>BE: Created vehicle record
+        BE-->>FE: 201 Created — { vehicle_id, registration, ... }
+    end
+    deactivate BE
+
+    %% ── Post-Save ────────────────────────────────────────
+
+    Note over User, FE: Post-Save — Refresh & Navigate
+
+    FE->>BE: GET /api/users/cards<br/>Authorization: Bearer <token>
+    activate BE
+    BE->>DB: Query cards for user
+    DB-->>BE: Updated card list
+    BE-->>FE: 200 OK — Cards[]
+    deactivate BE
+
+    FE->>BE: GET /api/users/vehicles<br/>Authorization: Bearer <token>
+    activate BE
+    BE->>DB: Query vehicles for user
+    DB-->>BE: Updated vehicle list
+    BE-->>FE: 200 OK — Vehicles[]
+    deactivate BE
+
+    FE->>FE: Update AuthContext<br/>with refreshed cards & vehicles
+    FE->>User: Navigate to /edit<br/>(card list page)
 ```

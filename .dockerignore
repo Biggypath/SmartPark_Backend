@@ -1,0 +1,16 @@
+node_modules
+npm-debug.log
+coverage
+.nyc_output
+.env
+.env.*
+!.env.example
+dist
+*.log
+.git
+.gitignore
+README.md
+SEQUENCE_DIAGRAM.md
+FRONTEND_API_SPEC.md
+test
+jest.config.cjs

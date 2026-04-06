@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import express from 'express';
 import http from 'http';
 import { Server } from 'socket.io';
@@ -14,17 +15,22 @@ import parkingRoutes from './routes/parkingRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
 import { initSocketHandlers } from './infrastructure/socket/socketHandler.js';
 
+// CORS: Allow the frontend origin (set CORS_ORIGIN in production)
+// Accepts a comma-separated list of origins, or "*" for all.
+const rawOrigin = process.env.CORS_ORIGIN || '*';
+const corsOrigin = rawOrigin === '*' ? '*' : rawOrigin.split(',').map(o => o.trim());
+
 const app = express();
 const server = http.createServer(app);
 
 export const io = new Server(server, {
-  cors: { origin: "*" }
+  cors: { origin: corsOrigin, credentials: corsOrigin !== '*' }
 });
 
 // Initialize WebSocket handlers
 initSocketHandlers(io);
 
-app.use(cors());
+app.use(cors({ origin: corsOrigin, credentials: corsOrigin !== '*' }));
 app.use(express.json());
 
 // Health check endpoint
@@ -48,8 +54,8 @@ const startServer = async () => {
   // // 2. Start all event consumers (OCR entry, OCR exit)
   // await startAllConsumers();
 
-  // 3. Start HTTP Server
-  server.listen(PORT, () => {
+  // 3. Start HTTP Server — bind 0.0.0.0 so Docker can expose the port
+  server.listen(Number(PORT), '0.0.0.0', () => {
     console.log(`SmartPark Backend running on port ${PORT}`);
   });
 };

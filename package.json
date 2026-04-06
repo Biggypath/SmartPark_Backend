@@ -5,9 +5,11 @@
   "main": "index.js",
   "scripts": {
     "dev": "tsx src/app.ts",
+    "start": "tsx src/app.ts",
     "test": "jest --config jest.config.cjs",
     "test:coverage": "jest --config jest.config.cjs --coverage",
-    "seed": "tsx prisma/seed.ts"
+    "seed": "tsx prisma/seed.ts",
+    "migrate:deploy": "npx prisma migrate deploy"
   },
   "repository": {
     "type": "git",
@@ -30,7 +32,8 @@
     "dotenv": "^17.3.1",
     "express": "^5.2.1",
     "jsonwebtoken": "^9.0.3",
-    "pg": "^8.18.0"
+    "pg": "^8.18.0",
+    "socket.io": "^4.8.3"
   },
   "devDependencies": {
     "@types/amqplib": "^0.10.8",
