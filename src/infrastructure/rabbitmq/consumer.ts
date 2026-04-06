@@ -1,6 +1,6 @@
 import { getChannel, QUEUES } from './connection.js';
 import * as parkingService from '../../services/parkingService.js';
-import { sendEntryAck, sendExitAck } from './producer.js';
+import { sendEntryAck, sendExitAck, sendBarrierCommand } from './producer.js';
 import { emitSlotUpdate, emitSessionClosed } from '../socket/socketHandler.js';
 import type { ConsumeMessage } from 'amqplib';
 import type { OcrEntryEvent, OcrExitEvent } from '../../types/index.js';
@@ -45,6 +45,15 @@ export const startOcrEntryConsumer = async () => {
         status: 'ALLOWED',
         slotId: result.slot?.slot_id,
       });
+
+      // Send barrier command to ESP32 via MQTT
+      if (event.camId) {
+        await sendBarrierCommand({
+          camId: event.camId,
+          lotId: event.lotId,
+          command: 'OPEN',
+        });
+      }
 
       channel.ack(msg);
     } catch (error) {
@@ -110,6 +119,15 @@ export const startOcrExitConsumer = async () => {
         totalFee: result.totalFee,
         durationMinutes: result.durationMinutes,
       });
+
+      // Send barrier command to ESP32 via MQTT
+      if (event.camId) {
+        await sendBarrierCommand({
+          camId: event.camId,
+          lotId: event.lotId,
+          command: 'OPEN',
+        });
+      }
 
       channel.ack(msg);
     } catch (error) {

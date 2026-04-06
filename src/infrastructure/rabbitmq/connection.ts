@@ -3,13 +3,19 @@ import type { Connection, Channel } from 'amqplib';
 
 const RABBITMQ_URL = process.env.RABBITMQ_URL || 'amqp://localhost';
 
-// Queue names
+// AMQP queue names (backend ↔ OCR server)
 export const QUEUES = {
   OCR_ENTRY: 'ocr.entry.events',
   OCR_EXIT: 'ocr.exit.events',
   OCR_ENTRY_ACK: 'ocr.entry.ack',
   OCR_EXIT_ACK: 'ocr.exit.ack',
 } as const;
+
+// Topic exchange used by the MQTT plugin.
+// RabbitMQ's MQTT plugin maps MQTT topics to this exchange automatically.
+// MQTT topic separators '/' are converted to AMQP routing key separators '.'
+//   e.g. MQTT topic  "barrier/commands/cam-01"  ↔  routing key "barrier.commands.cam-01"
+export const MQTT_EXCHANGE = 'amq.topic';
 
 let connection: Connection | null = null;
 let channel: Channel | null = null;
@@ -21,11 +27,16 @@ export const connectRabbitMQ = async (): Promise<Channel> => {
 
     console.log('Connected to RabbitMQ');
 
-    // Assert all queues (idempotent)
+    // Assert AMQP queues (for backend ↔ OCR server communication)
     await channel.assertQueue(QUEUES.OCR_ENTRY, { durable: true });
     await channel.assertQueue(QUEUES.OCR_EXIT, { durable: true });
     await channel.assertQueue(QUEUES.OCR_ENTRY_ACK, { durable: true });
     await channel.assertQueue(QUEUES.OCR_EXIT_ACK, { durable: true });
+
+    // amq.topic is a built-in exchange — assert it to confirm it exists.
+    // ESP32 devices connect via MQTT and subscribe to topics on this exchange.
+    await channel.assertExchange(MQTT_EXCHANGE, 'topic', { durable: true });
+    console.log('MQTT topic exchange (amq.topic) ready for ESP32 barrier commands');
 
     return channel;
   } catch (error) {

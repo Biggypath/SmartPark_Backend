@@ -41,7 +41,14 @@ export interface OcrExitAck {
   reason?: string;
 }
 
-// 5. Response Object for Fee Calculation
+// 5. Barrier Command (sent to ESP32 via MQTT through amq.topic exchange)
+export interface BarrierCommand {
+  camId: string;        // Target ESP32 camera/barrier ID
+  lotId: string;        // Parking lot ID
+  command: 'OPEN' | 'CLOSE'; // Barrier action
+}
+
+// 6. Response Object for Fee Calculation
 export interface ExitFeeResult {
   durationMinutes: number;
   billableHours: number;
@@ -50,7 +57,7 @@ export interface ExitFeeResult {
   exitTime: Date;
 }
 
-// 6. Authenticated Request (JWT payload attached by authMiddleware)
+// 7. Authenticated Request (JWT payload attached by authMiddleware)
 export interface AuthRequest extends Request {
   user?: { user_id: string; role: string };
 }
