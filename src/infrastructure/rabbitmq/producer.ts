@@ -32,7 +32,8 @@ export const sendExitAck = async (ack: OcrExitAck) => {
 export const sendBarrierCommand = async (cmd: BarrierCommand) => {
   const channel = getChannel();
   const routingKey = `barrier.commands.${cmd.camId}`;
-  const message = JSON.stringify({ ...cmd, timestamp: new Date().toISOString() });
+  // Send only { command } — ESP32 expects a minimal payload
+  const message = JSON.stringify({ command: cmd.command });
   channel.publish(MQTT_EXCHANGE, routingKey, Buffer.from(message));
   console.log(`[Barrier CMD] ${cmd.command} → ${cmd.camId} (lot: ${cmd.lotId})`);
 };

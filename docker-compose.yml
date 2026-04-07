@@ -8,7 +8,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-smartpark_secret}
       POSTGRES_DB: smartpark
     ports:
-      - "5432:5432"
+      - "5434:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -27,7 +27,7 @@ services:
       RABBITMQ_PLUGINS: rabbitmq_management,rabbitmq_mqtt
     ports:
       - "5672:5672"    # AMQP protocol
-      - "1883:1883"    # MQTT protocol (for ESP32 devices)
+      - "1884:1883"    # MQTT protocol (for ESP32 devices)
       - "15672:15672"  # Management UI
     volumes:
       - rabbitmqdata:/var/lib/rabbitmq

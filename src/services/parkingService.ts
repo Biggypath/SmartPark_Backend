@@ -3,6 +3,8 @@ import * as slotRepo from '../repositories/slotRepository.js';
 import * as sessionRepo from '../repositories/sessionRepository.js';
 import { calculateFee } from './pricingService.js';
 
+type TransactionClient = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
+
 /**
  * Returns all parking lots.
  */
@@ -15,7 +17,7 @@ export const getLots = async () => {
  */
 export const getParkingHistory = async (userId: string) => {
   const sessions = await sessionRepo.findSessionsByUserId(userId);
-  return sessions.map((s) => ({
+  return sessions.map((s: (typeof sessions)[number]) => ({
     session_id: s.session_id,
     location: s.slot?.lot?.name ?? null,
     address: s.slot?.lot?.location ?? null,
@@ -58,7 +60,7 @@ export const getDashboardData = async () => {
  * 3. Mark the slot as OCCUPIED and create a parking session.
  */
 export const handleOcrEntry = async (registration: string, province: string, lotId: string, slotId: string) => {
-  return await prisma.$transaction(async (tx) => {
+  return await prisma.$transaction(async (tx: TransactionClient) => {
     // Verify the slot exists and is available
     const slot = await tx.parkingSlot.findUnique({
       where: { slot_id: slotId },
@@ -92,7 +94,7 @@ export const handleOcrEntry = async (registration: string, province: string, lot
     // Verify the vehicle has a card matching this lot's privilege program
     const lotProgramId = slot.lot.program_id;
     const hasMatchingProgram = vehicle.cards.some(
-      (card) => card.program_id === lotProgramId
+      (card: { program_id: string | null }) => card.program_id === lotProgramId
     );
 
     if (!hasMatchingProgram) {
@@ -141,7 +143,7 @@ export const handleOcrEntry = async (registration: string, province: string, lot
  * 4. Close session, free the slot.
  */
 export const handleOcrExit = async (registration: string, province: string, lotId: string, slotId: string) => {
-  return await prisma.$transaction(async (tx) => {
+  return await prisma.$transaction(async (tx: TransactionClient) => {
     // Find active session by license plate and slot
     const session = await tx.parkingSession.findFirst({
       where: { registration, province, slot_id: slotId, exit_time: null },

@@ -5,8 +5,8 @@ import { Server } from 'socket.io';
 import cors from 'cors';
 
 // Import RabbitMQ
-// import { connectRabbitMQ } from './infrastructure/rabbitmq/connection.js';
-// import { startAllConsumers } from './infrastructure/rabbitmq/consumer.js';
+import { connectRabbitMQ } from './infrastructure/rabbitmq/connection.js';
+import { startAllConsumers } from './infrastructure/rabbitmq/consumer.js';
 
 // Import routes
 import authRoutes from './routes/authRoutes.js';
@@ -49,10 +49,10 @@ const PORT = process.env.PORT || 3000;
 // Initialize Server
 const startServer = async () => {
   // // 1. Connect to RabbitMQ
-  // await connectRabbitMQ();
+  await connectRabbitMQ();
 
   // // 2. Start all event consumers (OCR entry, OCR exit)
-  // await startAllConsumers();
+  await startAllConsumers();
 
   // 3. Start HTTP Server — bind 0.0.0.0 so Docker can expose the port
   server.listen(Number(PORT), '0.0.0.0', () => {

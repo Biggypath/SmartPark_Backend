@@ -184,6 +184,7 @@ model Road {
 model ParkingSlot {
   slot_id              String     @id // e.g. "A1", "B2"
   lot_id               String
+  cam_id               String?    @unique // ESP32-CAM identifier, e.g. "cam-01"
   status               SlotStatus @default(FREE)
   location_coordinates String     // Stores JSON string "{x:10, y:0, z:5}" for Three.js
   rotation             Float      // Rotation in degrees for Three.js visualization
