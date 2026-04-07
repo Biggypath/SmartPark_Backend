@@ -7,6 +7,7 @@ export interface OcrEntryEvent {
   registration: string;  // e.g. "1กข 1234"
   province: string;      // e.g. "กรุงเทพมหานคร"
   lotId: string;         // Which parking lot this camera belongs to
+  slotId: string;        // The specific slot this ESP32-CAM is attached to
   camId?: string;        // Camera identifier
 }
 
@@ -15,6 +16,7 @@ export interface OcrExitEvent {
   registration: string;
   province: string;
   lotId: string;
+  slotId: string;        // The specific slot this ESP32-CAM is attached to
   camId?: string;
 }
 

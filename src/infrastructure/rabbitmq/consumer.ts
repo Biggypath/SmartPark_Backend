@@ -21,20 +21,18 @@ export const startOcrEntryConsumer = async () => {
       const event: OcrEntryEvent = JSON.parse(msg.content.toString());
       console.log(`[OCR Entry] ${event.registration} (${event.province}) at lot ${event.lotId}`);
 
-      const result = await parkingService.handleOcrEntry(event.registration, event.province, event.lotId);
+      const result = await parkingService.handleOcrEntry(event.registration, event.province, event.lotId, event.slotId);
 
-      if (result.slot) {
-        // Notify frontend via Socket.io — slot is now OCCUPIED
-        emitSlotUpdate(event.lotId, {
-          slot_id: result.slot.slot_id,
-          status: 'OCCUPIED',
-          session: {
-            session_id: result.session.session_id,
-            registration: event.registration,
-            province: event.province,
-          },
-        });
-      }
+      // Notify frontend via Socket.io — slot is now OCCUPIED
+      emitSlotUpdate(event.lotId, {
+        slot_id: event.slotId,
+        status: 'OCCUPIED',
+        session: {
+          session_id: result.session.session_id,
+          registration: event.registration,
+          province: event.province,
+        },
+      });
 
       // Send ACK back to ThaiLicensePlateOCR
       await sendEntryAck({
@@ -43,7 +41,7 @@ export const startOcrEntryConsumer = async () => {
         registration: event.registration,
         province: event.province,
         status: 'ALLOWED',
-        slotId: result.slot?.slot_id,
+        slotId: event.slotId,
       });
 
       // Send barrier command to ESP32 via MQTT
@@ -93,18 +91,16 @@ export const startOcrExitConsumer = async () => {
       const event: OcrExitEvent = JSON.parse(msg.content.toString());
       console.log(`[OCR Exit] ${event.registration} (${event.province}) at lot ${event.lotId}`);
 
-      const result = await parkingService.handleOcrExit(event.registration, event.province, event.lotId);
+      const result = await parkingService.handleOcrExit(event.registration, event.province, event.lotId, event.slotId);
 
-      if (result.slotId) {
-        emitSlotUpdate(result.lotId, {
-          slot_id: result.slotId,
-          status: 'FREE',
-        });
-      }
+      emitSlotUpdate(event.lotId, {
+        slot_id: event.slotId,
+        status: 'FREE',
+      });
 
-      emitSessionClosed(result.lotId, {
+      emitSessionClosed(event.lotId, {
         session_id: result.sessionId,
-        slot_id: result.slotId ?? '',
+        slot_id: event.slotId,
         total_fee: result.totalFee,
         duration_minutes: result.durationMinutes,
       });
