@@ -61,7 +61,8 @@ export const handleOcrEntry = async (registration: string, province: string, lot
   return await prisma.$transaction(async (tx) => {
     // Verify the slot exists and is available
     const slot = await tx.parkingSlot.findUnique({
-      where: { slot_id: slotId }
+      where: { slot_id: slotId },
+      include: { lot: true }
     });
 
     if (!slot || slot.lot_id !== lotId) {
@@ -83,7 +84,23 @@ export const handleOcrEntry = async (registration: string, province: string, lot
       }
     });
 
-    const isRegistered = vehicle && vehicle.cards.length > 0;
+    // Reject unregistered vehicles
+    if (!vehicle || vehicle.cards.length === 0) {
+      throw new Error(`Vehicle ${registration} (${province}) is not registered with any active privilege card.`);
+    }
+
+    // Verify the vehicle has a card matching this lot's privilege program
+    const lotProgramId = slot.lot.program_id;
+    const hasMatchingProgram = vehicle.cards.some(
+      (card) => card.program_id === lotProgramId
+    );
+
+    if (!hasMatchingProgram) {
+      const lotName = slot.lot.name;
+      throw new Error(`Vehicle ${registration} does not have a privilege card for lot "${lotName}".`);
+    }
+
+    const isRegistered = true;
 
     // Mark slot as OCCUPIED
     await tx.parkingSlot.update({
