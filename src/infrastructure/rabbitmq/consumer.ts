@@ -3,7 +3,12 @@ import * as parkingService from '../../services/parkingService.js';
 import { sendEntryAck, sendExitAck, sendBarrierCommand } from './producer.js';
 import { emitSlotUpdate, emitSessionClosed } from '../socket/socketHandler.js';
 import type { ConsumeMessage } from 'amqplib';
-import type { OcrEntryEvent, OcrExitEvent } from '../../types/index.js';
+import type { OcrEntryEvent, OcrExitEvent, BarrierStatus } from '../../types/index.js';
+
+// Debounce map: camId → consecutive "no car" count.
+// Only free the slot after BARRIER_CONFIRM_COUNT consecutive BLOCKED + !carUnderSensor messages.
+const barrierNoCarCount = new Map<string, number>();
+const BARRIER_CONFIRM_COUNT = parseInt(process.env.BARRIER_CONFIRM_COUNT || '3', 10);
 
 /**
  * Consumer: OCR Entry Events
@@ -148,10 +153,71 @@ export const startOcrExitConsumer = async () => {
 };
 
 /**
+ * Consumer: Barrier Status (from ESP32 via MQTT → amq.topic)
+ * When a barrier reports BLOCKED with no car detected, free the slot.
+ */
+export const startBarrierStatusConsumer = async () => {
+  const channel = getChannel();
+  const queue = QUEUES.BARRIER_STATUS;
+
+  console.log(`Listening on queue: ${queue}`);
+
+  channel.consume(queue, async (msg: ConsumeMessage | null) => {
+    if (!msg) return;
+    try {
+      const status: BarrierStatus = JSON.parse(msg.content.toString());
+      const camId = status.camId;
+
+      // Debounce: count consecutive "no car" readings before acting
+      if (status.slotState === 'BLOCKED' && !status.carUnderSensor) {
+        const count = (barrierNoCarCount.get(camId) || 0) + 1;
+        barrierNoCarCount.set(camId, count);
+
+        if (count >= BARRIER_CONFIRM_COUNT) {
+          // Confirmed: car is gone — free the slot
+          barrierNoCarCount.delete(camId);
+
+          const result = await parkingService.handleBarrierStatus(
+            camId,
+            status.slotState,
+            status.carUnderSensor,
+          );
+
+          if (result) {
+            emitSlotUpdate(result.lotId, {
+              slot_id: result.slotId,
+              status: 'FREE',
+            });
+
+            if (result.sessionId) {
+              emitSessionClosed(result.lotId, {
+                session_id: result.sessionId,
+                slot_id: result.slotId,
+                total_fee: 0,
+                duration_minutes: 0,
+              });
+            }
+          }
+        }
+      } else {
+        // Car detected or state changed — reset counter
+        barrierNoCarCount.delete(camId);
+      }
+
+      channel.ack(msg);
+    } catch (error) {
+      console.error('[Barrier Status] Error:', error);
+      channel.ack(msg);
+    }
+  });
+};
+
+/**
  * Start all consumers.
  */
 export const startAllConsumers = async () => {
   await startOcrEntryConsumer();
   await startOcrExitConsumer();
+  await startBarrierStatusConsumer();
   console.log('All RabbitMQ consumers started.');
 };

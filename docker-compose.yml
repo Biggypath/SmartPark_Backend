@@ -63,7 +63,7 @@ services:
       PORT: 8080
       NODE_ENV: production
       DATABASE_URL: postgresql://smartpark:${POSTGRES_PASSWORD:-smartpark_secret}@postgres:5432/smartpark
-      RABBITMQ_URL: amqp://${RABBITMQ_USER:-smartpark}:${RABBITMQ_PASS:-smartpark_secret}@rabbitmq:5672
+      RABBITMQ_URL: amqp://${RABBITMQ_USER:-smartpark}:${RABBITMQ_PASS:-smartpark_secret}@rabbitmq:5672?heartbeat=15
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
       CORS_ORIGIN: ${CORS_ORIGIN:-*}
     depends_on:

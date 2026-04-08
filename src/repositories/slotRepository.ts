@@ -36,6 +36,10 @@ export const findSlotById = async (slotId: string) => {
   return prisma.parkingSlot.findUnique({ where: { slot_id: slotId } });
 };
 
+export const findSlotByCamId = async (camId: string) => {
+  return prisma.parkingSlot.findUnique({ where: { cam_id: camId }, include: { lot: true } });
+};
+
 export const updateSlotStatus = async (slotId: string, status: SlotStatus) => {
   return prisma.parkingSlot.update({
     where: { slot_id: slotId },

@@ -9,6 +9,7 @@ export const QUEUES = {
   OCR_EXIT: 'ocr.exit.events',
   OCR_ENTRY_ACK: 'ocr.entry.ack',
   OCR_EXIT_ACK: 'ocr.exit.ack',
+  BARRIER_STATUS: 'barrier.status',
 } as const;
 
 // Topic exchange used by the MQTT plugin.
@@ -37,6 +38,13 @@ export const connectRabbitMQ = async (): Promise<Channel> => {
     // ESP32 devices connect via MQTT and subscribe to topics on this exchange.
     await channel.assertExchange(MQTT_EXCHANGE, 'topic', { durable: true });
     console.log('MQTT topic exchange (amq.topic) ready for ESP32 barrier commands');
+
+    // Bind barrier status queue to receive ESP32 status messages via MQTT.
+    // ESP32 publishes to MQTT topic: barrier/status/<camId>
+    // RabbitMQ converts to routing key: barrier.status.<camId>
+    await channel.assertQueue(QUEUES.BARRIER_STATUS, { durable: true });
+    await channel.bindQueue(QUEUES.BARRIER_STATUS, MQTT_EXCHANGE, 'barrier.status.*');
+    console.log('Barrier status queue bound to amq.topic (barrier.status.*)');
 
     return channel;
   } catch (error) {

@@ -226,3 +226,50 @@ export const checkSession = async (registration: string, province: string) => {
     payment_status: session.payment_status,
   };
 };
+
+/**
+ * Handle Barrier Status from ESP32 (via MQTT → amq.topic):
+ * When the barrier reports slotState "BLOCKED" and carUnderSensor is false,
+ * the slot should be freed if it is currently OCCUPIED (stale session cleanup).
+ */
+export const handleBarrierStatus = async (camId: string, slotState: string, carUnderSensor: boolean) => {
+  // Only act when barrier is BLOCKED and no car is detected
+  if (slotState !== 'BLOCKED' || carUnderSensor) return null;
+
+  const slot = await slotRepo.findSlotByCamId(camId);
+  if (!slot || slot.status !== 'OCCUPIED') return null;
+
+  return await prisma.$transaction(async (tx: TransactionClient) => {
+    // Find and close any active session on this slot
+    const session = await tx.parkingSession.findFirst({
+      where: { slot_id: slot.slot_id, exit_time: null },
+    });
+
+    if (session) {
+      const now = new Date();
+      const feeResult = calculateFee(session.entry_time, now);
+
+      await tx.parkingSession.update({
+        where: { session_id: session.session_id },
+        data: {
+          exit_time: now,
+          duration_minutes: feeResult.durationMinutes,
+          total_fee: feeResult.totalFee,
+          payment_status: feeResult.totalFee > 0 ? 'PENDING' : 'PAID',
+        },
+      });
+
+      console.log(`[Barrier Cleanup] Closed session ${session.session_id} for slot ${slot.slot_id}`);
+    }
+
+    // Free the slot
+    await tx.parkingSlot.update({
+      where: { slot_id: slot.slot_id },
+      data: { status: 'FREE' },
+    });
+
+    console.log(`[Barrier Cleanup] Slot ${slot.slot_id} reset to FREE (cam: ${camId})`);
+
+    return { slotId: slot.slot_id, lotId: slot.lot_id, sessionId: session?.session_id ?? null };
+  });
+};

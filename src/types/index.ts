@@ -50,6 +50,20 @@ export interface BarrierCommand {
   command: 'OPEN' | 'CLOSE'; // Barrier action
 }
 
+// 5b. Barrier Status (received from ESP32 via MQTT through amq.topic exchange)
+export interface BarrierStatus {
+  camId: string;
+  slotState: string;       // e.g. "BLOCKED", "OPEN", etc.
+  armDown: boolean;
+  carUnderSensor: boolean;
+  ultraDistanceCm: number;
+  confirmRemainingMs: number;
+  openCount: number;
+  closeCount: number;
+  abortCount: number;
+  uptimeMs: number;
+}
+
 // 6. Response Object for Fee Calculation
 export interface ExitFeeResult {
   durationMinutes: number;
